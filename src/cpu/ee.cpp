@@ -23,5 +23,5 @@ void EmotionEngine::reset_state()
 
 void EmotionEngine::fetch_instruction()
 {
-    
+
 }

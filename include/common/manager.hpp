@@ -3,8 +3,6 @@
 #include <vector>
 #include <cpu/ee.hpp>
 
-constexpr uint32_t MEMORY_RANGE = 0x20000000;
-
 /* This class act as the "motherboard" of sorts */
 class ComponentManager {
 public:
@@ -12,6 +10,13 @@ public:
     ~ComponentManager() = default;
 
     void tick_components();
+
+    /* Memory operations */
+    template <typename T>
+    T read_memory(uint32_t addr);
+
+    template <typename T>
+    void write_memory(uint32_t addr, T data);
 
 protected:
     void read_bios();
