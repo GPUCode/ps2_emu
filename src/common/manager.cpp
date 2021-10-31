@@ -1,9 +1,11 @@
 #include <common/manager.hpp>
+#include <common/memmap.hpp>
 #include <fstream>
 #include <iostream>
 #include <memory>
 
-ComponentManager::ComponentManager()
+ComponentManager::ComponentManager() :
+    memory(MEMORY_RANGE, 0)
 {
     ee = std::make_unique<EmotionEngine>(this);
 }
@@ -18,11 +20,11 @@ void ComponentManager::read_bios()
         exit(1);
     
     reader.seekg(0);
-    reader.read((char*)bios.data(), 4 * 1024 * 1024);
+    reader.read((char*)(memory.data() + BIOS.start), 4 * 1024 * 1024);
     reader.close();
 }
 
-void ComponentManager::tick()
+void ComponentManager::tick_components()
 {
     ee->tick();
 }
