@@ -47,6 +47,7 @@ T ComponentManager::read_memory(uint32_t addr)
 template <typename T>
 void ComponentManager::write_memory(uint32_t addr, T data)
 {
+    std::cout << "Written: " << std::hex << data << " to address: " << addr << '\n';
     uint32_t vaddr = addr & KUSEG_MASKS[addr >> 29];
     auto ptr = (T*)(memory.data() + vaddr);
 
@@ -55,4 +56,5 @@ void ComponentManager::write_memory(uint32_t addr, T data)
 
 /* Template definitions. */
 template uint32_t ComponentManager::read_memory<uint32_t>(uint32_t);
+template uint128_t ComponentManager::read_memory<uint128_t>(uint32_t);
 template void ComponentManager::write_memory<uint32_t>(uint32_t, uint32_t);

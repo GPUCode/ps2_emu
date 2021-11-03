@@ -35,14 +35,11 @@ union Instruction {
     }
 };
 
+using uint128_t = unsigned __int128;
 union Register {
-    unsigned __int128 value;
-    struct {
-        uint64_t quadword[2];
-    };
-    struct {
-        uint32_t doubleword[4];
-    };
+    uint128_t quadword;
+    uint64_t doubleword[2];
+    uint32_t word[4];
 };
 
 constexpr uint8_t SPECIAL_OPCODE = 0b000000;
@@ -63,7 +60,8 @@ public:
     /* Opcodes */
     void op_cop0(); void op_mfc0(); void op_sw();
     void op_special(); void op_sll(); void op_slti();
-    void op_bne();
+    void op_bne(); void op_ori(); void op_addi();
+    void op_lq();
 
 protected:
     ComponentManager* manager;

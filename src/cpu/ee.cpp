@@ -25,6 +25,9 @@ void EmotionEngine::reset_state()
     /* Reset instruction holders */
     instr.value = 0;
     next_instr.value = 0;
+
+    /* Set this to zero */
+    gpr[0].quadword = 0;
 }
 
 void EmotionEngine::fetch_instruction()
@@ -32,9 +35,9 @@ void EmotionEngine::fetch_instruction()
     /* Handle branch delay slots by prefetching the next one */
     instr.value = next_instr.value;
     next_instr = manager->read_memory<uint32_t>(pc);
+    std::cout << "PC: " << std::hex << pc << ' ' << std::dec;
+
     pc += 4;
-    
-    std::cout << "PC: " << std::hex << pc << " Instruction: " << instr.value << '\n';
     switch(instr.opcode)
     {
     case COP0_OPCODE: op_cop0(); break;
@@ -42,6 +45,9 @@ void EmotionEngine::fetch_instruction()
     case 0b101011: op_sw(); break;
     case 0b001010: op_slti(); break;
     case 0b000101: op_bne(); break;
+    case 0b001101: op_ori(); break;
+    case 0b001000: op_addi(); break;
+    case 0b011110: op_lq(); break;
     default:
         std::cout << "Unimplemented opcode: " << std::bitset<6>(instr.opcode) << '\n';
         std::abort();
@@ -72,7 +78,9 @@ void EmotionEngine::op_cop0()
 void EmotionEngine::op_mfc0()
 {
 	COP0Instr data{instr.value};
-    gpr[data.rt].value = cop0.regs[data.action];
+    gpr[data.rt].quadword = cop0.regs[data.action];
+
+    std::cout << "MFC0: GPR[" << data.rt << "] = COP0_REG[" << data.action << "] (" << cop0.regs[data.action] << ")\n";
 }
 
 void EmotionEngine::op_special()
@@ -85,44 +93,87 @@ void EmotionEngine::op_special()
 
 void EmotionEngine::op_sw()
 {
-    uint8_t base = instr.i_type.rs;
-    uint8_t rt = instr.i_type.rt;
-    uint16_t offset = instr.i_type.immediate;
+    uint16_t base = instr.i_type.rs;
+    uint16_t rt = instr.i_type.rt;
+    int16_t offset = (int16_t)instr.i_type.immediate;
 
-    uint32_t vaddr = (uint32_t)(int16_t)offset + gpr[base].doubleword[0];
+    uint32_t vaddr = offset + gpr[base].word[0];
     if (vaddr & 0b11 != 0)
-        return; /* NOTE: SignalException (AddressError) */
+    {
+        std::cout << "SW: Address 0x" << std::hex << vaddr << " is not aligned\n";
+        std::exit(1); /* NOTE: SignalException (AddressError) */
+    }
 
-    uint32_t data = gpr[rt].doubleword[0];
+    uint32_t data = gpr[rt].word[0];
+    std::cout << "SW: Writing data: " << data << " to address: 0x" << vaddr << '\n';
     manager->write_memory<uint32_t>(vaddr, data);
 }
 
 void EmotionEngine::op_sll()
 {
-    uint8_t rt = instr.r_type.rt;
-    uint8_t rd = instr.r_type.rd;
-    uint8_t sa = instr.r_type.sa;
+    uint16_t rt = instr.r_type.rt;
+    uint16_t rd = instr.r_type.rd;
+    uint32_t sa = instr.r_type.sa;
 
-    uint32_t result = gpr[rt].doubleword[0] << sa;
-    gpr[rd].quadword[0] = (uint64_t)(int32_t)result;
+    uint32_t result = gpr[rt].word[0] << sa;
+    gpr[rd].doubleword[0] = (uint64_t)(int32_t)result;
+
+    if (instr.value == 0)
+        std::cout << "NOP\n";
+    else
+        std::cout << "SLL: GPR[" << rd << "] = GPR[" << rt << "] (" << gpr[rd].doubleword[0] << ") << " << sa << '\n';
 }
 
 void EmotionEngine::op_slti()
 {
-    uint8_t rs = instr.i_type.rs;
-    uint8_t rt = instr.i_type.rt;
-    uint16_t imm = instr.i_type.immediate;
+    uint16_t rs = instr.i_type.rs;
+    uint16_t rt = instr.i_type.rt;
+    int64_t imm = (int64_t)(int16_t)instr.i_type.immediate;
 
-    gpr[rt].quadword[0] = gpr[rs].quadword[0] < (uint32_t)(int16_t)imm; 
+    gpr[rt].doubleword[0] = (int64_t)gpr[rs].doubleword[0] < imm;
+    std::cout << "SLTI: GPR[" << rt << "] = GPR[" << rs << "] (" << (int64_t)gpr[rs].doubleword[0] << ") < " << imm << '\n';
 }
 
 void EmotionEngine::op_bne()
 {
-    uint8_t rt = instr.i_type.rt;
-    uint8_t rs = instr.i_type.rs;
-    uint16_t imm = instr.i_type.immediate;
+    uint16_t rt = instr.i_type.rt;
+    uint16_t rs = instr.i_type.rs;
+    int32_t imm = (int16_t)instr.i_type.immediate;
 
-    uint32_t offset = (uint32_t)(int16_t)imm << 2;
-    if (gpr[rs].quadword[0] != gpr[rt].quadword[0])
+    int32_t offset = imm << 2;
+    std::cout << "BNE: || GPR[" << rt << "] (" << gpr[rt].doubleword[0] << ") != GPR[" << rs << "] (" << gpr[rs].doubleword[0];
+    std::cout << ")|| -> OFFSET: " << offset << '\n'; 
+    if (gpr[rs].doubleword[0] != gpr[rt].doubleword[0])
         pc += offset;
+}
+
+void EmotionEngine::op_ori()
+{
+    uint16_t rs = instr.i_type.rs;
+    uint16_t rt = instr.i_type.rt;
+    int16_t imm = (int16_t)instr.i_type.immediate;
+
+    gpr[rt].doubleword[0] = gpr[rs].doubleword[0] | imm;
+    std::cout << "ORI: GPR[" << rt << "] = GPR[" << rs << "] (" << gpr[rs].doubleword[0] << ") | " << imm << '\n';
+}
+
+void EmotionEngine::op_addi()
+{
+    uint16_t rs = instr.i_type.rs;
+    uint16_t rt = instr.i_type.rt;
+    int16_t imm = (int16_t)instr.i_type.immediate;
+
+    /* TODO: Overflow detection */
+    gpr[rt].doubleword[0] = gpr[rs].doubleword[0] + imm;
+    std::cout << "ADDI: GPR[" << rt << "] = GPR[" << rs << " (" << gpr[rs].doubleword[0] << ") + " << imm << '\n';
+}
+
+void EmotionEngine::op_lq()
+{
+    uint16_t rt = instr.i_type.rt;
+    uint16_t base = instr.i_type.rs;
+    int16_t imm = (int16_t)instr.i_type.immediate;
+
+    uint32_t vaddr = (gpr[base].doubleword[0] + imm) | 0b0000;
+    gpr[rt].quadword = manager->read_memory<uint128_t>(vaddr);
 }
