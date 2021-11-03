@@ -28,6 +28,9 @@ void EmotionEngine::reset_state()
 
     /* Set this to zero */
     gpr[0].quadword = 0;
+
+    /* Set EE pRId */
+    cop0.prid = 0x00002E20;
 }
 
 void EmotionEngine::fetch_instruction()
