@@ -63,6 +63,7 @@ public:
     /* Opcodes */
     void op_cop0(); void op_mfc0(); void op_sw();
     void op_special(); void op_sll(); void op_slti();
+    void op_bne();
 
 protected:
     ComponentManager* manager;
@@ -70,9 +71,9 @@ protected:
     /* Registers. */
     Register gpr[32];
     uint32_t pc;
-    uint64_t hi0, hi1, lo0, lo1; /* Used to store multiplication and division results */
-    uint32_t sa; /* Specifies the shift amount used by the funnel shift instruction */
-    Instruction instr;
+    uint64_t hi0, hi1, lo0, lo1;
+    uint32_t sa;
+    Instruction instr, next_instr;
 
     /* Coprocessors */
     COP0 cop0;

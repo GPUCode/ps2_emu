@@ -21,25 +21,31 @@ void EmotionEngine::reset_state()
 {
     /* Reset PC. */
     pc = 0xbfc00000;
+
+    /* Reset instruction holders */
+    instr.value = 0;
+    next_instr.value = 0;
 }
 
 void EmotionEngine::fetch_instruction()
 {
-    instr.value = manager->read_memory<uint32_t>(pc);
+    /* Handle branch delay slots by prefetching the next one */
+    instr.value = next_instr.value;
+    next_instr = manager->read_memory<uint32_t>(pc);
+    pc += 4;
+    
     std::cout << "PC: " << std::hex << pc << " Instruction: " << instr.value << '\n';
-
     switch(instr.opcode)
     {
     case COP0_OPCODE: op_cop0(); break;
     case SPECIAL_OPCODE: op_special(); break;
     case 0b101011: op_sw(); break;
     case 0b001010: op_slti(); break;
+    case 0b000101: op_bne(); break;
     default:
         std::cout << "Unimplemented opcode: " << std::bitset<6>(instr.opcode) << '\n';
         std::abort();
     }
-
-    pc += 4;
 }
 
 void EmotionEngine::op_cop0()
