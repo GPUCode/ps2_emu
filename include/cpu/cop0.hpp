@@ -6,9 +6,7 @@ constexpr uint8_t COP0_OPCODE = 0b010000;
 union COP0Instr {
     uint32_t value;
     struct {
-        uint32_t input : 11; /* This is used differently depending on the action (look COP0Input) */
-        uint32_t action : 5; /* Perf or Debug or rd in MFC0 */
-        uint32_t rt : 5;
+        uint32_t : 21; /* This differs too much between instructions, requires manual parsing */ 
         uint32_t type : 5;
         uint32_t opcode : 6;
     };
@@ -20,29 +18,11 @@ union COP0Instr {
     }
 };
 
-union COP0Input {
-    uint32_t input;
-    struct {
-        uint32_t id : 3; /* Tells us which MF* instruction to execute */
-        uint32_t : 8;
-    } debug;
-    struct {
-        uint32_t source : 1; /* 0: MFPS 1: MFPC */ 
-        uint32_t reg : 5; /* The index of the PEV (Performance Event Specifier) or PC (Performace Counter) respectively */
-        uint32_t : 5;
-    } perf;
-
-    COP0Input& operator=(uint32_t val)
-    {
-        input = val;
-        return *this;
-    }
-};
-
 /* Instruction types */
 constexpr uint8_t COP0_MF0 = 0b00000;
 constexpr uint8_t COP0_MT0 = 0b00100;
 constexpr uint8_t COP0_C0 = 0b10000;
+constexpr uint8_t COP0_TLB = 0b10000;
 
 /* The status register fields */
 union COP0Status {
@@ -78,7 +58,7 @@ enum OperatingMode {
 
 /* The COP0 registers */
 union COP0 {
-	uint32_t regs[32];
+	uint32_t regs[32] = {0};
 
 	struct {
         uint32_t index;

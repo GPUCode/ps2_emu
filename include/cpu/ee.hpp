@@ -61,7 +61,9 @@ public:
     void op_cop0(); void op_mfc0(); void op_sw();
     void op_special(); void op_sll(); void op_slti();
     void op_bne(); void op_ori(); void op_addi();
-    void op_lq();
+    void op_lq(); void op_lui(); void op_jr(); void op_addiu();
+    void op_tlbwi(); void op_mtc0(); void op_lw(); void op_mmi();
+    void op_madd1(); void op_jalr(); void op_sd();
 
 protected:
     ComponentManager* manager;
