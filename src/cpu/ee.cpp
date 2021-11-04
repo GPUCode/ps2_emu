@@ -37,7 +37,7 @@ void EmotionEngine::fetch_instruction()
 {
     /* Handle branch delay slots by prefetching the next one */
     instr.value = next_instr.value;
-    next_instr = manager->read_memory<uint32_t>(pc);
+    next_instr = read<uint32_t>(pc);
     std::cout << "PC: " << std::hex << pc - 4 << " Instruction: 0x" << instr.value << ' ' << std::dec;
 
     pc += 4;
@@ -59,6 +59,24 @@ void EmotionEngine::fetch_instruction()
         std::cout << "Unimplemented opcode: " << std::bitset<6>(instr.opcode) << '\n';
         std::abort();
     }
+}
+
+template <typename T>
+T EmotionEngine::read(uint32_t addr)
+{
+    if (addr >= 0x70000000 && addr < 0x70004000) /* Read from scratchpad */
+        return *(uint32_t*)&scratchpad[addr & 0x3FFC];
+    else
+        return manager->read<T>(addr);
+}
+
+template <typename T>
+void EmotionEngine::write(uint32_t addr, T data)
+{
+    if (addr >= 0x70000000 && addr < 0x70004000)
+        *(uint32_t*)&scratchpad[addr & 0x3FFC] = data;
+    else
+        manager->write<T>(addr, data);
 }
 
 void EmotionEngine::op_cop0()
@@ -138,7 +156,7 @@ void EmotionEngine::op_sw()
     uint32_t data = gpr[rt].word[0];
     std::cout << "SW: Writing GPR[" << rt << std::hex << "] (0x" << data << ") to address: 0x" << vaddr;
     std::cout << " = GPR[" << base << "] (" << gpr[base].word[0] << ") + " << std::dec << offset << '\n';
-    manager->write_memory<uint32_t>(vaddr, data);
+    write<uint32_t>(vaddr, data);
 }
 
 void EmotionEngine::op_sll()
@@ -207,7 +225,7 @@ void EmotionEngine::op_lq()
     int16_t imm = (int16_t)instr.i_type.immediate;
 
     uint32_t vaddr = (gpr[base].doubleword[0] + imm) | 0b0000;
-    gpr[rt].quadword = manager->read_memory<uint128_t>(vaddr);
+    gpr[rt].quadword = read<uint128_t>(vaddr);
 
     std::cout << "LQ: GPR[" << rt << "] = 0x" << std::hex << gpr[rt].doubleword[0] << " from address 0x" << vaddr  << '\n';
 }
@@ -307,5 +325,11 @@ void EmotionEngine::op_sd()
     uint64_t data = gpr[rt].doubleword[0];
     std::cout << "SD: Writing GPR[" << rt << std::hex << "] (0x" << data << ") to address: 0x" << vaddr;
     std::cout << " = GPR[" << base << "] (" << gpr[base].word[0] << ") + " << std::dec << offset << '\n';
-    manager->write_memory<uint64_t>(vaddr, data);
+    write<uint64_t>(vaddr, data);
 }
+
+/* Template definitions. */
+template uint32_t EmotionEngine::read<uint32_t>(uint32_t);
+template uint128_t EmotionEngine::read<uint128_t>(uint32_t);
+template void EmotionEngine::write<uint32_t>(uint32_t, uint32_t);
+template void EmotionEngine::write<uint64_t>(uint32_t, uint64_t);

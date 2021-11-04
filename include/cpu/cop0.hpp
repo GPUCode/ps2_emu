@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 /* All COP0 instructions have this */
 constexpr uint8_t COP0_OPCODE = 0b010000;

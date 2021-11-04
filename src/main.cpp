@@ -33,7 +33,7 @@ int main()
         	glfwSetWindowShouldClose(window, true);
         
         /* Update all the components (CPU, GPU, DMA) */
-        manager.tick_components();
+        manager.tick();
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);

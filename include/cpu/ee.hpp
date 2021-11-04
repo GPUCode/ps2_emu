@@ -1,6 +1,6 @@
 #pragma once
-#include <cstdint>
 #include <cpu/cop0.hpp>
+#include <array>
 
 /* Nice interface for instructions */
 union Instruction {
@@ -57,6 +57,13 @@ public:
     void reset_state();
     void fetch_instruction();
 
+    /* Memory operations */
+    template <typename T>
+    T read(uint32_t addr);
+
+    template <typename T>
+    void write(uint32_t addr, T data);
+
     /* Opcodes */
     void op_cop0(); void op_mfc0(); void op_sw();
     void op_special(); void op_sll(); void op_slti();
@@ -74,6 +81,9 @@ protected:
     uint64_t hi0, hi1, lo0, lo1;
     uint32_t sa;
     Instruction instr, next_instr;
+
+    /* Scratchpad */
+    uint8_t scratchpad[16 * 1024];
 
     /* Coprocessors */
     COP0 cop0;

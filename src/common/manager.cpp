@@ -4,14 +4,21 @@
 #include <iostream>
 #include <memory>
 
-ComponentManager::ComponentManager() :
-    memory(MEMORY_RANGE, 0)
+ComponentManager::ComponentManager()
 {
     ee = std::make_unique<EmotionEngine>(this);
+    
+    /* Allocate the entire 32MB of RAM */
+    memory = new uint8_t[MEMORY_RANGE];
 
     /* Load the BIOS in our memory */
     /* NOTE: Must make a GUI for this someday */
     this->read_bios();
+}
+
+ComponentManager::~ComponentManager()
+{
+    delete[] memory;
 }
 
 void ComponentManager::read_bios()
@@ -24,38 +31,35 @@ void ComponentManager::read_bios()
         exit(1);
     
     reader.seekg(0);
-    reader.read((char*)memory.data() + BIOS.start, BIOS.length);
+    reader.read((char*)memory + BIOS.start, BIOS.length);
     reader.close();
 }
 
-void ComponentManager::tick_components()
+void ComponentManager::tick()
 {
     ee->tick();
 }
 
 /* Instanciate the templates here so we can limit their types below */
 template <typename T>
-T ComponentManager::read_memory(uint32_t addr)
+T ComponentManager::read(uint32_t addr)
 {
     uint32_t vaddr = addr & KUSEG_MASKS[addr >> 29];
-    auto ptr = (T*)(memory.data() + vaddr);
-
-    return ptr[0];
+    T data = *(T*)&memory[vaddr];
+    return data;
 }
 
 /* Instanciate the templates here so we can limit their types below */
 template <typename T>
-void ComponentManager::write_memory(uint32_t addr, T data)
+void ComponentManager::write(uint32_t addr, T data)
 {
-    std::cout << "Written: " << std::hex << data << " to address: " << addr << '\n';
+    std::cout << "Written: 0x" << std::hex << (uint64_t)data << " to address: 0x" << addr << '\n';
     uint32_t vaddr = addr & KUSEG_MASKS[addr >> 29];
-    auto ptr = (T*)(memory.data() + vaddr);
-
-    ptr[0] = data;
+    *(T*)&memory[vaddr] = data;
 }
 
 /* Template definitions. */
-template uint32_t ComponentManager::read_memory<uint32_t>(uint32_t);
-template uint128_t ComponentManager::read_memory<uint128_t>(uint32_t);
-template void ComponentManager::write_memory<uint32_t>(uint32_t, uint32_t);
-template void ComponentManager::write_memory<uint64_t>(uint32_t, uint64_t);
+template uint32_t ComponentManager::read<uint32_t>(uint32_t);
+template uint128_t ComponentManager::read<uint128_t>(uint32_t);
+template void ComponentManager::write<uint32_t>(uint32_t, uint32_t);
+template void ComponentManager::write<uint64_t>(uint32_t, uint64_t);
