@@ -25,7 +25,7 @@ void ComponentManager::read_bios()
 {  
     /* Yes it's hardcoded for now, don't bite me, I'll change it eventually */
     std::ifstream reader;
-    reader.open("/home/emufan/Desktop/gcnemu/build/bin/bios30004.bin", std::ios::in | std::ios::binary);
+    reader.open("SCPH-30003.BIN", std::ios::in | std::ios::binary);
 
     if (!reader.is_open())
         exit(1);
@@ -60,6 +60,6 @@ void ComponentManager::write(uint32_t addr, T data)
 
 /* Template definitions. */
 template uint32_t ComponentManager::read<uint32_t>(uint32_t);
-template uint128_t ComponentManager::read<uint128_t>(uint32_t);
+template uint64_t ComponentManager::read<uint64_t>(uint32_t);
 template void ComponentManager::write<uint32_t>(uint32_t, uint32_t);
 template void ComponentManager::write<uint64_t>(uint32_t, uint64_t);

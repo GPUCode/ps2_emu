@@ -30,7 +30,7 @@ struct Range {
 		return (addr >= start && addr < start + length);
 	}
 
-	inline uint offset(uint32_t addr) const 
+	inline uint32_t offset(uint32_t addr) const 
 	{
 		return addr - start;
 	}

@@ -35,9 +35,7 @@ union Instruction {
     }
 };
 
-using uint128_t = unsigned __int128;
 union Register {
-    uint128_t quadword;
     uint64_t doubleword[2];
     uint32_t word[4];
 };

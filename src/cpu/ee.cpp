@@ -27,7 +27,7 @@ void EmotionEngine::reset_state()
     next_instr.value = 0;
 
     /* Set this to zero */
-    gpr[0].quadword = 0;
+    gpr[0].doubleword[0] = gpr[0].doubleword[1] = 0;
 
     /* Set EE pRId */
     cop0.prid = 0x00002E20;
@@ -123,7 +123,7 @@ void EmotionEngine::op_mfc0()
     uint16_t rd = (instr.value >> 11) & 0x1F;
     uint16_t rt = (instr.value >> 16) & 0x1F;
 
-    gpr[rt].quadword = cop0.regs[rd];
+    gpr[rt].doubleword[0] = cop0.regs[rd];
 
     std::cout << "MFC0: GPR[" << rt << "] = COP0_REG[" << rd << "] (" << cop0.regs[rd] << ")\n";
 }
@@ -241,7 +241,8 @@ void EmotionEngine::op_lq()
     int16_t imm = (int16_t)instr.i_type.immediate;
 
     uint32_t vaddr = (gpr[base].doubleword[0] + imm) | 0b0000;
-    gpr[rt].quadword = read<uint128_t>(vaddr);
+    gpr[rt].doubleword[0] = read<uint64_t>(vaddr);
+    gpr[rt].doubleword[1] = read<uint64_t>(vaddr + 8);
 
     std::cout << "LQ: GPR[" << rt << "] = 0x" << std::hex << gpr[rt].doubleword[0] << " from address 0x" << vaddr  << '\n';
 }
@@ -395,6 +396,6 @@ void EmotionEngine::op_addu()
 
 /* Template definitions. */
 template uint32_t EmotionEngine::read<uint32_t>(uint32_t);
-template uint128_t EmotionEngine::read<uint128_t>(uint32_t);
+template uint64_t EmotionEngine::read<uint64_t>(uint32_t);
 template void EmotionEngine::write<uint32_t>(uint32_t, uint32_t);
 template void EmotionEngine::write<uint64_t>(uint32_t, uint64_t);
