@@ -70,7 +70,8 @@ public:
     void op_bne(); void op_ori(); void op_addi();
     void op_lq(); void op_lui(); void op_jr(); void op_addiu();
     void op_tlbwi(); void op_mtc0(); void op_lw(); void op_mmi();
-    void op_madd1(); void op_jalr(); void op_sd();
+    void op_madd1(); void op_jalr(); void op_sd(); void op_jal();
+    void op_sra(); void op_regimm(); void op_bgez(); void op_addu();
 
 protected:
     ComponentManager* manager;
