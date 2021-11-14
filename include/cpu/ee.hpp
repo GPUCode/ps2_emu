@@ -36,7 +36,7 @@ union Instruction {
 };
 
 union Register {
-    uint64_t doubleword[2];
+    uint64_t dword[2];
     uint32_t word[4];
 };
 
@@ -70,6 +70,9 @@ public:
     void op_tlbwi(); void op_mtc0(); void op_lw(); void op_mmi();
     void op_madd1(); void op_jalr(); void op_sd(); void op_jal();
     void op_sra(); void op_regimm(); void op_bgez(); void op_addu();
+    void op_daddu(); void op_andi(); void op_beq(); void op_or();
+    void op_mult(); void op_divu(); void op_beql(); void op_mflo();
+    void op_sltiu(); void op_bnel();
 
 protected:
     ComponentManager* manager;
@@ -80,6 +83,8 @@ protected:
     uint64_t hi0, hi1, lo0, lo1;
     uint32_t sa;
     Instruction instr, next_instr;
+
+    bool skip_branch_delay = false;
 
     /* Scratchpad */
     uint8_t scratchpad[16 * 1024];
