@@ -227,7 +227,7 @@ void EmotionEngine::op_bne()
 
     int32_t offset = imm << 2;
     if (gpr[rs].dword[0] != gpr[rt].dword[0])
-        pc += offset;
+        pc += offset - 4;
     
     fmt::print("BNE: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
 }
@@ -238,9 +238,9 @@ void EmotionEngine::op_ori()
     uint16_t rt = instr.i_type.rt;
     uint16_t imm = instr.i_type.immediate;
 
-    gpr[rt].dword[0] = gpr[rs].dword[0] | (uint64_t)imm;
-
     fmt::print("ORI: GPR[{:d}] = GPR[{:d}] ({:#x}) | {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
+
+    gpr[rt].dword[0] = gpr[rs].dword[0] | (uint64_t)imm;
 }
 
 void EmotionEngine::op_addi()
@@ -353,7 +353,7 @@ void EmotionEngine::op_jalr()
     gpr[rd].dword[0] = pc + 4; /* Normally this should be PC + 8 but we compensate for the prefetching with -4 */
     pc = gpr[rs].word[0];
 
-    fmt::print("JALR: Jumping to PC = GPR[{:d}] ({:#x}) with link address {:#x}\n", rs, pc, gpr[rs].dword[0]);
+    fmt::print("JALR: Jumping to PC = GPR[{:d}] ({:#x}) with link address {:#x}\n", rs, pc, gpr[rd].dword[0]);
 }
 
 void EmotionEngine::op_sd()
@@ -403,7 +403,7 @@ void EmotionEngine::op_bgez()
 
     int32_t offset = imm << 2;
     if (gpr[rs].dword[0] >= 0)
-        pc += offset;
+        pc += offset - 4;
 
     fmt::print("BGEZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].word[0], offset);
 }
@@ -445,11 +445,11 @@ void EmotionEngine::op_beq()
 {
     uint16_t rt = instr.i_type.rt;
     uint16_t rs = instr.i_type.rs;
-    uint32_t imm = instr.i_type.immediate;
-
-    int32_t offset = (int32_t)(imm << 2);
+    int32_t imm = (int32_t)instr.i_type.immediate;
+    
+    int32_t offset = imm << 2;
     if (gpr[rs].dword[0] == gpr[rt].dword[0])
-        pc += offset;
+        pc += offset - 4;
     
     fmt::print("BEQ: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
 }
@@ -460,7 +460,7 @@ void EmotionEngine::op_or()
     uint16_t rs = instr.r_type.rs;
     uint16_t rd = instr.r_type.rd;
 
-    fmt::print("ORI: GPR[{:d}] = GPR[{:d}] ({:#x}) | GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    fmt::print("OR: GPR[{:d}] = GPR[{:d}] ({:#x}) | GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
 
     gpr[rd].dword[0] = gpr[rs].dword[0] | gpr[rt].dword[0];
 }
@@ -472,8 +472,8 @@ void EmotionEngine::op_mult()
     uint16_t rd = instr.r_type.rd;
 
     int64_t result = (int64_t)gpr[rs].word[0] * (int64_t)gpr[rt].word[0];
-    gpr[rd].dword[0] = lo0 = (int64_t)(int32_t)(result & 0xFFFFFFFF);
-    hi0 = (int64_t)(int32_t)(result >> 32);
+    gpr[rd].dword[0] = lo0 = (int32_t)(result & 0xFFFFFFFF);
+    hi0 = (int32_t)(result >> 32);
 
     fmt::print("MULT: GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", rd, lo0, hi0);
 }
@@ -505,7 +505,7 @@ void EmotionEngine::op_beql()
 
     int32_t offset = (int32_t)(imm << 2);
     if (gpr[rs].dword[0] == gpr[rt].dword[0])
-        pc += offset;
+        pc += offset - 4;
     else
         skip_branch_delay = true;
 
@@ -540,7 +540,7 @@ void EmotionEngine::op_bnel()
 
     int32_t offset = (int32_t)(imm << 2);
     if (gpr[rs].dword[0] != gpr[rt].dword[0])
-        pc += offset;
+        pc += offset - 4;
     else
         skip_branch_delay = true;
 
