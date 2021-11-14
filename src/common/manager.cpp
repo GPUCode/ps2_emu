@@ -53,7 +53,6 @@ T ComponentManager::read(uint32_t addr)
 template <typename T>
 void ComponentManager::write(uint32_t addr, T data)
 {
-    std::cout << "Written: 0x" << std::hex << (uint64_t)data << " to address: 0x" << addr << '\n';
     uint32_t vaddr = addr & KUSEG_MASKS[addr >> 29];
     *(T*)&memory[vaddr] = data;
 }

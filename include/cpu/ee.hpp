@@ -77,7 +77,7 @@ public:
     void op_sra(); void op_regimm(); void op_bgez(); void op_addu();
     void op_daddu(); void op_andi(); void op_beq(); void op_or();
     void op_mult(); void op_divu(); void op_beql(); void op_mflo();
-    void op_sltiu(); void op_bnel();
+    void op_sltiu(); void op_bnel(); void op_sync();
 
 protected:
     ComponentManager* manager;
