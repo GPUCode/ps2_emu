@@ -186,6 +186,7 @@ void EmotionEngine::op_sw()
     uint32_t vaddr = offset + gpr[base].word[0];
     uint32_t data = gpr[rt].word[0];
 
+    fmt::print("SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
     if ((vaddr & 0b11) != 0)
     {
         fmt::print("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
@@ -193,8 +194,6 @@ void EmotionEngine::op_sw()
     }
     else
         write<uint32_t>(vaddr, data);
-
-    fmt::print("SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_sll()
@@ -217,7 +216,7 @@ void EmotionEngine::op_slti()
 
     gpr[rt].dword[0] = (int64_t)gpr[rs].dword[0] < imm;
     
-    fmt::print("SLTI: GPR[{:d}] = GPR[{:d}] ({:#x}) < {:d}\n", rt, rs, gpr[rs].dword[0], imm);
+    fmt::print("SLTI: GPR[{:d}] = GPR[{:d}] ({:#x}) < {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
 }
 
 void EmotionEngine::op_bne()
@@ -239,7 +238,7 @@ void EmotionEngine::op_ori()
     uint16_t rt = instr.i_type.rt;
     uint16_t imm = instr.i_type.immediate;
 
-    gpr[rt].dword[0] = gpr[rs].dword[0] | imm;
+    gpr[rt].dword[0] = gpr[rs].dword[0] | (uint64_t)imm;
 
     fmt::print("ORI: GPR[{:d}] = GPR[{:d}] ({:#x}) | {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
 }
@@ -276,7 +275,7 @@ void EmotionEngine::op_lui()
 
     gpr[rt].dword[0] = (int64_t)(int32_t)(imm << 16);
 
-    fmt::print("LUI: GPR[{:d}] = {:#x}\n", rt, imm);
+    fmt::print("LUI: GPR[{:d}] = {:#x}\n", rt, gpr[rt].dword[0]);
 }
 
 void EmotionEngine::op_jr()
@@ -298,8 +297,7 @@ void EmotionEngine::op_addiu()
     uint16_t rs = instr.i_type.rs;
     int16_t imm = (int16_t)instr.i_type.immediate;
 
-    int64_t temp = gpr[rs].dword[0] + (int64_t)imm;
-    gpr[rt].dword[0] = (int64_t)(int32_t)(temp & 0xFFFFFFFF);
+    gpr[rt].dword[0] = (int32_t)(gpr[rs].dword[0] + imm);
     
     fmt::print("ADDIU: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
 }
@@ -462,9 +460,9 @@ void EmotionEngine::op_or()
     uint16_t rs = instr.r_type.rs;
     uint16_t rd = instr.r_type.rd;
 
-    gpr[rd].dword[0] = gpr[rs].dword[0] | gpr[rt].dword[0];
-
     fmt::print("ORI: GPR[{:d}] = GPR[{:d}] ({:#x}) | GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+
+    gpr[rd].dword[0] = gpr[rs].dword[0] | gpr[rt].dword[0];
 }
 
 void EmotionEngine::op_mult()
@@ -487,8 +485,8 @@ void EmotionEngine::op_divu()
 
     if (gpr[rt].word[0] != 0)
     {
-        lo0 = gpr[rs].word[0] / gpr[rt].word[0];
-        hi0 = gpr[rs].word[0] % gpr[rt].word[0];
+        lo0 = (int64_t)(int32_t)(gpr[rs].word[0] / gpr[rt].word[0]);
+        hi0 = (int64_t)(int32_t)(gpr[rs].word[0] % gpr[rt].word[0]);
         
         fmt::print("DIVU: LO0 = GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x})\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0]);
     }
