@@ -63,3 +63,4 @@ template uint64_t ComponentManager::read<uint64_t>(uint32_t);
 template uint8_t ComponentManager::read<uint8_t>(uint32_t);
 template void ComponentManager::write<uint32_t>(uint32_t, uint32_t);
 template void ComponentManager::write<uint64_t>(uint32_t, uint64_t);
+template void ComponentManager::write<uint8_t>(uint32_t, uint8_t);
