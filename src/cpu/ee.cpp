@@ -23,8 +23,8 @@ void EmotionEngine::reset_state()
     pc = 0xbfc00000;
 
     /* Reset instruction holders */
-    instr.value = 0;
-    next_instr.value = 0;
+    instr.value = instr.pc = 0;
+    next_instr.value = next_instr.pc = 0;
 
     /* Set this to zero */
     gpr[0].dword[0] = gpr[0].dword[1] = 0;
@@ -36,12 +36,15 @@ void EmotionEngine::reset_state()
 void EmotionEngine::fetch_instruction()
 {
     /* Handle branch delay slots by prefetching the next one */
-    instr.value = next_instr.value;
-    next_instr = read<uint32_t>(pc);
-    std::cout << "PC: " << std::hex << pc - 4 << " Instruction: 0x" << instr.value << ' ' << std::dec;
-    //if (pc - 4 == 0x9fc43288) __debugbreak();
-
+    instr = next_instr;
+    next_instr.value = read<uint32_t>(pc);
+    next_instr.pc = pc;
+    
+    /* Update PC */
     pc += 4;
+    std::cout << "PC: 0x" << std::hex << instr.pc << " Instruction: 0x" << instr.value << ' ' << std::dec;
+
+    /* Skip the delay slot for any BEQ* instructions */
     if (skip_branch_delay)
     {
         skip_branch_delay = false;
