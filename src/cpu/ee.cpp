@@ -2,7 +2,9 @@
 #include <common/manager.hpp>
 #include <bitset>
 #include <iostream>
-#include <fmt/core.h>
+#include <fmt/color.h>
+
+constexpr auto BOLD = fg(fmt::color::green_yellow) | fmt::emphasis::bold;
 
 EmotionEngine::EmotionEngine(ComponentManager* parent)
 {
@@ -199,7 +201,7 @@ void EmotionEngine::op_sw()
     uint32_t vaddr = offset + gpr[base].word[0];
     uint32_t data = gpr[rt].word[0];
 
-    fmt::print("SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    fmt::print(BOLD, "SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
     if ((vaddr & 0b11) != 0)
     {
         fmt::print("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
@@ -313,7 +315,7 @@ void EmotionEngine::op_lb()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = (int64_t)read<uint8_t>(vaddr);
 
-    fmt::print("LB: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    fmt::print(BOLD, "LB: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_swc1()
@@ -344,7 +346,7 @@ void EmotionEngine::op_lbu()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = read<uint8_t>(vaddr);
 
-    fmt::print("LBU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    fmt::print(BOLD, "LBU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_ld()
@@ -356,7 +358,7 @@ void EmotionEngine::op_ld()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = read<uint64_t>(vaddr);
 
-    fmt::print("LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    fmt::print(BOLD, "LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_j()
@@ -377,7 +379,7 @@ void EmotionEngine::op_sb()
     uint32_t vaddr = offset + gpr[base].word[0];
     uint16_t data = gpr[rt].word[0] & 0xFF;
 
-    fmt::print("SB: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    fmt::print(BOLD, "SB: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
     write<uint8_t>(vaddr, data);
 }
 
@@ -468,7 +470,7 @@ void EmotionEngine::op_lw()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = (int32_t)read<uint32_t>(vaddr);
 
-    fmt::print("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    fmt::print(BOLD, "LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_addiu()
@@ -552,7 +554,7 @@ void EmotionEngine::op_sd()
     else
         write<uint64_t>(vaddr, data);
 
-    fmt::print("SD: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    fmt::print(BOLD, "SD: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_jal()
@@ -625,7 +627,7 @@ void EmotionEngine::op_beq()
 {
     uint16_t rt = instr.i_type.rt;
     uint16_t rs = instr.i_type.rs;
-    int32_t imm = (int32_t)instr.i_type.immediate;
+    int32_t imm = (int16_t)instr.i_type.immediate;
     
     int32_t offset = imm << 2;
     if (gpr[rs].dword[0] == gpr[rt].dword[0])
@@ -681,9 +683,9 @@ void EmotionEngine::op_beql()
 {
     uint16_t rt = instr.i_type.rt;
     uint16_t rs = instr.i_type.rs;
-    uint32_t imm = instr.i_type.immediate;
+    int32_t imm = (int16_t)instr.i_type.immediate;
 
-    int32_t offset = (int32_t)(imm << 2);
+    int32_t offset = imm << 2;
     if (gpr[rs].dword[0] == gpr[rt].dword[0])
         pc += offset - 4;
     else
@@ -716,9 +718,9 @@ void EmotionEngine::op_bnel()
 {
     uint16_t rt = instr.i_type.rt;
     uint16_t rs = instr.i_type.rs;
-    uint32_t imm = instr.i_type.immediate;
+    int32_t imm = (int16_t)instr.i_type.immediate;
 
-    int32_t offset = (int32_t)(imm << 2);
+    int32_t offset = imm << 2;
     if (gpr[rs].dword[0] != gpr[rt].dword[0])
         pc += offset - 4;
     else

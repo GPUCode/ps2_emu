@@ -1,8 +1,6 @@
 #include <common/manager.hpp>
 #include <common/memmap.hpp>
 #include <fstream>
-#include <iostream>
-#include <memory>
 
 ComponentManager::ComponentManager()
 {
