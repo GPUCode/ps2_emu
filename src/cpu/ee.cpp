@@ -74,6 +74,12 @@ void EmotionEngine::fetch_instruction()
     case 0b010100: op_beql(); break;
     case 0b001011: op_sltiu(); break;
     case 0b010101: op_bnel(); break;
+    case 0b100000: op_lb(); break;
+    case 0b111001: op_swc1(); break;
+    case 0b100100: op_lbu(); break;
+    case 0b110111: op_ld(); break;
+    case 0b000010: op_j(); break;
+    case 0b100011: op_lw(); break;
     default:
         fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
         std::abort();
@@ -205,7 +211,7 @@ void EmotionEngine::op_sll()
     gpr[rd].dword[0] = (uint64_t)(int32_t)(gpr[rt].word[0] << sa);
 
     if (instr.value == 0) fmt::print("NOP\n");
-    else fmt::print("SLL: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d}\n", rd, rt, gpr[rd].dword[0], sa);
+    else fmt::print("SLL: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d}\n", rd, rt, gpr[rt].dword[0], sa);
 }
 
 void EmotionEngine::op_slti()
@@ -289,6 +295,82 @@ void EmotionEngine::op_jr()
 void EmotionEngine::op_sync()
 {
     fmt::print("SYNC\n");
+}
+
+void EmotionEngine::op_lb()
+{
+    uint16_t rt = instr.i_type.rt;
+    uint16_t base = instr.i_type.rs;
+    int16_t offset = (int16_t)instr.i_type.immediate;
+
+    uint32_t vaddr = offset + gpr[base].word[0];
+    gpr[rt].dword[0] = (int64_t)read<uint8_t>(vaddr);
+
+    fmt::print("LB: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+}
+
+void EmotionEngine::op_swc1()
+{
+    uint16_t base = instr.i_type.rs;
+    uint16_t ft = instr.i_type.rt;
+    int16_t offset = (int16_t)instr.i_type.immediate;
+
+    uint32_t vaddr = offset + gpr[base].word[0];
+    uint32_t data = fpr[ft].word[0];
+
+    fmt::print("SWC1: Writing FPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", ft, data, vaddr, base, gpr[base].word[0], offset);
+    if ((vaddr & 0b11) != 0)
+    {
+        fmt::print("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
+        std::exit(1); /* NOTE: SignalException (AddressError) */
+    }
+    else
+        write<uint32_t>(vaddr, data);
+}
+
+void EmotionEngine::op_lbu()
+{
+    uint16_t rt = instr.i_type.rt;
+    uint16_t base = instr.i_type.rs;
+    int16_t offset = (int16_t)instr.i_type.immediate;
+
+    uint32_t vaddr = offset + gpr[base].word[0];
+    gpr[rt].dword[0] = read<uint8_t>(vaddr);
+
+    fmt::print("LBU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+}
+
+void EmotionEngine::op_ld()
+{
+    uint16_t rt = instr.i_type.rt;
+    uint16_t base = instr.i_type.rs;
+    int16_t offset = (int16_t)instr.i_type.immediate;
+
+    uint32_t vaddr = offset + gpr[base].word[0];
+    gpr[rt].dword[0] = read<uint64_t>(vaddr);
+
+    fmt::print("LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+}
+
+void EmotionEngine::op_j()
+{
+    uint32_t instr_index = instr.j_type.target;
+
+    pc = (pc & 0xF0000000) | (instr_index << 2);
+
+    fmt::print("J: Jumping to PC = {:#x}\n", pc);
+}
+
+void EmotionEngine::op_lw()
+{
+    uint16_t rt = instr.i_type.rt;
+    uint16_t base = instr.i_type.rs;
+    int16_t offset = (int16_t)instr.i_type.immediate;
+
+    uint32_t vaddr = offset + gpr[base].word[0];
+    gpr[rt].dword[0] = (int32_t)read<uint32_t>(vaddr);
+
+    fmt::print("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_addiu()
@@ -379,7 +461,7 @@ void EmotionEngine::op_jal()
 {
     uint32_t instr_index = instr.j_type.target;
     
-    gpr[31].dword[0] = pc + 4;
+    gpr[31].dword[0] = pc;
     pc = (pc & 0xF0000000) | (instr_index << 2);
     
     fmt::print("JAL: Jumping to PC = {:#x}\n", pc);
@@ -550,5 +632,6 @@ void EmotionEngine::op_bnel()
 /* Template definitions. */
 template uint32_t EmotionEngine::read<uint32_t>(uint32_t);
 template uint64_t EmotionEngine::read<uint64_t>(uint32_t);
+template uint8_t EmotionEngine::read<uint8_t>(uint32_t);
 template void EmotionEngine::write<uint32_t>(uint32_t, uint32_t);
 template void EmotionEngine::write<uint64_t>(uint32_t, uint64_t);

@@ -88,7 +88,8 @@ public:
     void op_sra(); void op_regimm(); void op_bgez(); void op_addu();
     void op_daddu(); void op_andi(); void op_beq(); void op_or();
     void op_mult(); void op_divu(); void op_beql(); void op_mflo();
-    void op_sltiu(); void op_bnel(); void op_sync();
+    void op_sltiu(); void op_bnel(); void op_sync(); void op_lb();
+    void op_swc1(); void op_lbu(); void op_ld(); void op_j();
 
 protected:
     ComponentManager* manager;
@@ -99,6 +100,10 @@ protected:
     uint64_t hi0, hi1, lo0, lo1;
     uint32_t sa;
     Instruction instr, next_instr;
+
+    /* FPU (COP1) registers */
+    Register fpr[32];
+    uint64_t fcr0, fcr31;
 
     bool skip_branch_delay = false;
 
