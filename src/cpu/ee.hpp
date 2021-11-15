@@ -91,7 +91,8 @@ public:
     void op_sltiu(); void op_bnel(); void op_sync(); void op_lb();
     void op_swc1(); void op_lbu(); void op_ld(); void op_j();
     void op_sb(); void op_div(); void op_mfhi(); void op_sltu();
-    void op_blez(); void op_subu(); void op_bgtz();
+    void op_blez(); void op_subu(); void op_bgtz(); void op_movn();
+    void op_slt(); void op_and(); void op_srl();
 
 protected:
     ComponentManager* manager;

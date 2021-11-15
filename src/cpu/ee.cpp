@@ -174,6 +174,10 @@ void EmotionEngine::op_special()
     case 0b010000: op_mfhi(); break;
     case 0b101011: op_sltu(); break;
     case 0b100011: op_subu(); break;
+    case 0b001011: op_movn(); break;
+    case 0b101010: op_slt(); break;
+    case 0b100100: op_and(); break;
+    case 0b000010: op_srl(); break;
     default:
         fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		std::exit(1);
@@ -227,11 +231,12 @@ void EmotionEngine::op_slti()
 {
     uint16_t rs = instr.i_type.rs;
     uint16_t rt = instr.i_type.rt;
-    int64_t imm = (int64_t)(int16_t)instr.i_type.immediate;
+    int64_t imm = (int16_t)instr.i_type.immediate;
 
-    gpr[rt].dword[0] = (int64_t)gpr[rs].dword[0] < imm;
+    int64_t reg = gpr[rs].dword[0];
+    gpr[rt].dword[0] = reg < imm;
     
-    fmt::print("SLTI: GPR[{:d}] = GPR[{:d}] ({:#x}) < {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
+    fmt::print("SLTI: GPR[{:d}] = GPR[{:d}] ({:#x}) < {:#x}\n", rt, rs, reg, imm);
 }
 
 void EmotionEngine::op_bne()
@@ -265,9 +270,10 @@ void EmotionEngine::op_addi()
     int16_t imm = (int16_t)instr.i_type.immediate;
 
     /* TODO: Overflow detection */
-    gpr[rt].dword[0] = gpr[rs].dword[0] + imm;
+    int64_t reg = gpr[rs].dword[0];
+    gpr[rt].dword[0] = reg + imm;
 
-    fmt::print("ADDI: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
+    fmt::print("ADDI: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, reg, imm);
 }
 
 void EmotionEngine::op_lq()
@@ -431,7 +437,8 @@ void EmotionEngine::op_blez()
     uint16_t rs = instr.i_type.rs;
 
     int32_t offset = imm << 2;
-    if (gpr[rs].dword[0] <= 0)
+    int64_t reg = gpr[rs].dword[0];
+    if (reg <= 0)
         pc += offset - 4;
 
     fmt::print("BLEZ: IF GPR[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
@@ -443,10 +450,11 @@ void EmotionEngine::op_subu()
     uint16_t rs = instr.r_type.rs;
     uint16_t rt = instr.r_type.rt;
 
-    uint32_t result = gpr[rs].dword[0] - gpr[rt].dword[0];
-    gpr[rd].dword[0] = (int64_t)(int32_t)(result & 0xFFFFFFFF);
+    int32_t reg1 = gpr[rs].dword[0];
+    int32_t reg2 = gpr[rt].dword[0];
+    gpr[rd].dword[0] = reg1 - reg2;
 
-    fmt::print("SUBU: GPR[{:d}] = GPR[{:d}] ({:#x}) - GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    fmt::print("SUBU: GPR[{:d}] = GPR[{:d}] ({:#x}) - GPR[{:d}] ({:#x})\n", rd, rs, reg1, rt, reg2);
 }
 
 void EmotionEngine::op_bgtz()
@@ -455,10 +463,57 @@ void EmotionEngine::op_bgtz()
     uint16_t rs = instr.i_type.rs;
 
     int32_t offset = imm << 2;
-    if (gpr[rs].dword[0] > 0)
+    int64_t reg = gpr[rs].dword[0];
+    if (reg > 0)
         pc += offset - 4;
 
     fmt::print("BGTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
+}
+
+void EmotionEngine::op_movn()
+{
+    uint16_t rd = instr.r_type.rd;
+    uint16_t rs = instr.r_type.rs;
+    uint16_t rt = instr.r_type.rt;
+
+    if (gpr[rt].dword[0] != 0) gpr[rd].dword[0] = gpr[rs].dword[0];
+
+    fmt::print("MOVN: IF GPR[{:d}] ({:#x}) != 0 THEN GPR[{:d}] = GPR[{:d}] ({:#x})\n", rt, gpr[rt].dword[0], rd, rs, gpr[rs].dword[0]);
+}
+
+void EmotionEngine::op_slt()
+{
+    uint16_t rd = instr.r_type.rd;
+    uint16_t rs = instr.r_type.rs;
+    uint16_t rt = instr.r_type.rt;
+
+    int64_t reg1 = gpr[rs].dword[0];
+    int64_t reg2 = gpr[rt].dword[0];
+    gpr[rd].dword[0] = reg1 < reg2;
+
+    fmt::print("SLT: GPR[{:d}] = GPR[{:d}] ({:#x}) < GPR[{:d}] ({:#x})\n", rd, rs, reg1, rt, reg2);
+}
+
+void EmotionEngine::op_and()
+{
+    uint16_t rd = instr.r_type.rd;
+    uint16_t rs = instr.r_type.rs;
+    uint16_t rt = instr.r_type.rt;
+
+    gpr[rd].dword[0] = gpr[rs].dword[0] & gpr[rt].dword[0];
+
+    fmt::print("AND: GPR[{:d}] = GPR[{:d}] ({:#x}) & GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+}
+
+void EmotionEngine::op_srl()
+{
+    uint16_t sa = instr.r_type.sa;
+    uint16_t rd = instr.r_type.rd;
+    uint16_t rt = instr.r_type.rt;
+
+    gpr[rd].dword[0] = (int32_t)(gpr[rt].word[0] >> sa);
+
+    fmt::print("SRL: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].word[0], sa);
 }
 
 void EmotionEngine::op_lw()
@@ -479,9 +534,10 @@ void EmotionEngine::op_addiu()
     uint16_t rs = instr.i_type.rs;
     int16_t imm = (int16_t)instr.i_type.immediate;
 
-    fmt::print("ADDIU: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
+    int32_t reg = gpr[rs].word[0];
+    gpr[rt].dword[0] = reg + imm;
 
-    gpr[rt].dword[0] = (int32_t)(gpr[rs].dword[0] + imm);
+    fmt::print("ADDIU: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, reg, imm);
 }
 
 void EmotionEngine::op_tlbwi()
@@ -573,7 +629,8 @@ void EmotionEngine::op_sra()
     uint16_t rd = instr.r_type.rd;
     uint16_t rt = instr.r_type.rt;
 
-    gpr[rd].dword[0] = (int64_t)(gpr[rt].word[0] >> sa);
+    int32_t reg = gpr[rt].word[0];
+    gpr[rd].dword[0] = reg >> sa;
 
     fmt::print("SRA: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].word[0], sa);
 }
@@ -584,10 +641,11 @@ void EmotionEngine::op_bgez()
     uint16_t rs = instr.i_type.rs;
 
     int32_t offset = imm << 2;
-    if (gpr[rs].dword[0] >= 0)
+    int64_t reg = gpr[rs].dword[0];
+    if (reg >= 0)
         pc += offset - 4;
 
-    fmt::print("BGEZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].word[0], offset);
+    fmt::print("BGEZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, reg, offset);
 }
 
 void EmotionEngine::op_addu()
@@ -596,9 +654,11 @@ void EmotionEngine::op_addu()
     uint16_t rs = instr.r_type.rs;
     uint16_t rd = instr.r_type.rd;
 
-    gpr[rd].dword[0] = (int32_t)(gpr[rs].dword[0] + gpr[rt].dword[0]);
+    int32_t reg1 = gpr[rs].dword[0];
+    int32_t reg2 = gpr[rt].dword[0];
+    gpr[rd].dword[0] = reg1 + reg2;
 
-    fmt::print("ADDU: GPR[{:d}] = GPR[{:d}] ({:#x}) + GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    fmt::print("ADDU: GPR[{:d}] = GPR[{:d}] ({:#x}) + GPR[{:d}] ({:#x})\n", rd, rs, reg1, rt, reg2);
 }
 
 void EmotionEngine::op_daddu()
@@ -607,7 +667,9 @@ void EmotionEngine::op_daddu()
     uint16_t rs = instr.r_type.rs;
     uint16_t rd = instr.r_type.rd;
 
-    gpr[rd].dword[0] = gpr[rs].dword[0] + gpr[rt].dword[0];
+    int64_t reg1 = gpr[rs].dword[0];
+    int64_t reg2 = gpr[rt].dword[0];
+    gpr[rd].dword[0] = reg1 + reg2;
 
     fmt::print("DADDU: GPR[{:d}] = GPR[{:d}] ({:#x}) + GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
 }
@@ -707,9 +769,9 @@ void EmotionEngine::op_sltiu()
 {
     uint16_t rt = instr.i_type.rt;
     uint16_t rs = instr.i_type.rs;
-    uint64_t imm = instr.i_type.immediate;
-
-    gpr[rt].dword[0] = (gpr[rs].dword[0] < imm);
+    uint64_t imm = (int16_t)instr.i_type.immediate;
+    
+    gpr[rt].dword[0] = gpr[rs].dword[0] < imm;
 
     fmt::print("SLTIU: GPR[{:d}] = GPR[{:d}] ({:#x}) < {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
 }
