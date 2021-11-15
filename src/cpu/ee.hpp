@@ -92,7 +92,8 @@ public:
     void op_swc1(); void op_lbu(); void op_ld(); void op_j();
     void op_sb(); void op_div(); void op_mfhi(); void op_sltu();
     void op_blez(); void op_subu(); void op_bgtz(); void op_movn();
-    void op_slt(); void op_and(); void op_srl();
+    void op_slt(); void op_and(); void op_srl(); void op_dsll32();
+    void op_dsra32(); void op_dsll(); void op_lhu();
 
 protected:
     ComponentManager* manager;

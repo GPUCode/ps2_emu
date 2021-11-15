@@ -8,6 +8,7 @@ ComponentManager::ComponentManager()
     
     /* Allocate the entire 32MB of RAM */
     memory = new uint8_t[MEMORY_RANGE];
+    std::memset(memory, 0, MEMORY_RANGE);
 
     /* Load the BIOS in our memory */
     /* NOTE: Must make a GUI for this someday */
@@ -59,6 +60,7 @@ void ComponentManager::write(uint32_t addr, T data)
 template uint32_t ComponentManager::read<uint32_t>(uint32_t);
 template uint64_t ComponentManager::read<uint64_t>(uint32_t);
 template uint8_t ComponentManager::read<uint8_t>(uint32_t);
+template uint16_t ComponentManager::read<uint16_t>(uint32_t);
 template void ComponentManager::write<uint32_t>(uint32_t, uint32_t);
 template void ComponentManager::write<uint64_t>(uint32_t, uint64_t);
 template void ComponentManager::write<uint8_t>(uint32_t, uint8_t);
