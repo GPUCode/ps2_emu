@@ -25,4 +25,7 @@ public:
     /* Components */
     std::unique_ptr<EmotionEngine> ee;
     uint8_t* memory;
+
+    uint32_t MCH_RICM = 0, MCH_DRD = 0;
+    uint8_t rdram_sdevid = 0;
 };

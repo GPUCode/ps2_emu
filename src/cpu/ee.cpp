@@ -116,8 +116,6 @@ void EmotionEngine::write(uint32_t addr, T data)
         *(T*)&scratchpad[addr & 0x3FFF] = data;
     else
         manager->write<T>(addr, data);
-
-    if (scratchpad[0x70003edd & 0x3FFF] == 0x33) __debugbreak();
 }
 
 void EmotionEngine::op_cop0()
@@ -786,11 +784,13 @@ void EmotionEngine::op_mult()
     uint16_t rs = instr.r_type.rs;
     uint16_t rd = instr.r_type.rd;
     
-    int64_t result = (int64_t)gpr[rs].word[0] * (int64_t)gpr[rt].word[0];
+    int64_t reg1 = (int64_t)gpr[rs].dword[0];
+    int64_t reg2 = (int64_t)gpr[rt].dword[0];
+    int64_t result = reg1 * reg2;
     gpr[rd].dword[0] = lo0 = (int32_t)(result & 0xFFFFFFFF);
     hi0 = (int32_t)(result >> 32);
 
-    log("MULT: GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", rd, lo0, hi0);
+    log("MULT: GPR[{:d}] ({:#x}) * GPR[{:d}] ({:#x}) = {:#x} STORED IN GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", rs, reg1, rt, reg2, result, rd, lo0, hi0);
 }
 
 void EmotionEngine::op_divu()
@@ -803,7 +803,7 @@ void EmotionEngine::op_divu()
         lo0 = (int64_t)(int32_t)(gpr[rs].word[0] / gpr[rt].word[0]);
         hi0 = (int64_t)(int32_t)(gpr[rs].word[0] % gpr[rt].word[0]);
         
-        log("DIVU: LO0 = GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x})\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0]);
+        log("DIVU: GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x}) OUTPUT LO0 = {:#x} and HI0 = {:#x}\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0], lo0, hi0);
     }
     else
     {
