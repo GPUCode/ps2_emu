@@ -48,6 +48,8 @@ T ComponentManager::read(uint32_t addr)
     uint32_t vaddr = addr & KUSEG_MASKS[addr >> 29];
     switch (vaddr)
     {
+    case 0x1000f410:
+        return 0;
     case 0x1000f440:
     {
         uint8_t SOP = (MCH_RICM >> 6) & 0xF;
@@ -122,3 +124,4 @@ template uint16_t ComponentManager::read<uint16_t>(uint32_t);
 template void ComponentManager::write<uint32_t>(uint32_t, uint32_t);
 template void ComponentManager::write<uint64_t>(uint32_t, uint64_t);
 template void ComponentManager::write<uint8_t>(uint32_t, uint8_t);
+template void ComponentManager::write<uint16_t>(uint32_t, uint16_t);

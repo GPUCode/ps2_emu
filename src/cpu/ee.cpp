@@ -92,6 +92,8 @@ void EmotionEngine::fetch_instruction()
     case 0b000110: op_blez(); break;
     case 0b000111: op_bgtz(); break;
     case 0b100101: op_lhu(); break;
+    case 0b101001: op_sh(); break;
+    case 0b001110: op_xori(); break;
     default:
         fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
         std::abort();
@@ -190,6 +192,7 @@ void EmotionEngine::op_special()
     case 0b111100: op_dsll32(); break;
     case 0b111111: op_dsra32(); break;
     case 0b111000: op_dsll(); break;
+    case 0b010111: op_dsrav(); break;
     default:
         fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		std::exit(1);
@@ -551,6 +554,94 @@ void EmotionEngine::op_bltz()
     log("BLTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
+void EmotionEngine::op_sh()
+{
+    uint16_t base = instr.i_type.rs;
+    uint16_t rt = instr.i_type.rt;
+    int16_t offset = (int16_t)instr.i_type.immediate;
+
+    uint32_t vaddr = offset + gpr[base].word[0];
+    uint16_t data = gpr[rt].word[0] & 0xFFFF;
+
+    log(BOLD, "SH: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    if ((vaddr & 1) != 0)
+    {
+        log("[ERROR] SH: Address {:#x} is not aligned\n", vaddr);
+        std::exit(1); /* NOTE: SignalException (AddressError) */
+    }
+    else
+        write<uint16_t>(vaddr, data);
+}
+
+void EmotionEngine::op_madd()
+{
+    uint16_t rd = instr.r_type.rd;
+    uint16_t rs = instr.r_type.rs;
+    uint16_t rt = instr.r_type.rt;
+
+    uint64_t lo = lo0 & 0xFFFFFFFF;
+    uint64_t hi = hi0 & 0xFFFFFFFF;
+    int64_t result = (hi << 32 | lo) + (int64_t)gpr[rs].word[0] * (int64_t)gpr[rt].word[0];
+
+    lo0 = (int64_t)(int32_t)(result & 0xFFFFFFFF);
+    hi0 = (int64_t)(int32_t)(result >> 32);
+    gpr[rd].dword[0] = (int64_t)lo0;
+
+    log("MADD: GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", lo0, hi0);
+}
+
+void EmotionEngine::op_divu1()
+{
+    uint16_t rt = instr.i_type.rt;
+    uint16_t rs = instr.i_type.rs;
+
+    if (gpr[rt].word[0] != 0)
+    {
+        lo1 = (int64_t)(int32_t)(gpr[rs].word[0] / gpr[rt].word[0]);
+        hi1 = (int64_t)(int32_t)(gpr[rs].word[0] % gpr[rt].word[0]);
+
+        log("DIVU1: GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x}) OUTPUT LO1 = {:#x} and HI1 = {:#x}\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0], lo1, hi1);
+    }
+    else
+    {
+        log("[ERROR] DIVU1: Division by zero!\n");
+        std::abort();
+    }
+}
+
+void EmotionEngine::op_mflo1()
+{
+    uint16_t rd = instr.r_type.rd;
+    
+    gpr[rd].dword[0] = lo1;
+
+    log("MFLO1: GPR[{:d}] = {:#x}\n", rd, lo1);
+}
+
+void EmotionEngine::op_xori()
+{
+    uint16_t rs = instr.i_type.rs;
+    uint16_t rt = instr.i_type.rt;
+    uint64_t imm = instr.i_type.immediate;
+
+    log("XORI: GPR[{:d}] = GPR[{:d}] ({:#x}) ^ {:d}\n", rt, rs, gpr[rs].dword[0], imm);
+
+    gpr[rt].dword[0] = gpr[rs].dword[0] ^ imm;
+}
+
+void EmotionEngine::op_dsrav()
+{
+    uint16_t rs = instr.r_type.rs;
+    uint16_t rd = instr.r_type.rd;
+    uint16_t rt = instr.r_type.rt;
+
+    int64_t reg = gpr[rt].dword[0];
+    uint16_t sa = gpr[rs].word[0] & 0x3F;
+    gpr[rd].dword[0] = reg >> sa;
+
+    log("DSRAV: GPR[{:d}] = GPR[{:d}] ({:#x}) >> GPR[{:d}] ({:d})\n", rd, rt, reg, rs, sa);
+}
+
 void EmotionEngine::op_lhu()
 {
     uint16_t rt = instr.i_type.rt;
@@ -626,11 +717,14 @@ void EmotionEngine::op_mtc0()
 
 void EmotionEngine::op_mmi()
 {
-    switch(instr.r_type.sa)
+    switch(instr.r_type.funct)
     {
-    case 0b10000: op_madd1(); break;
+    case 0b100000: op_madd1(); break;
+    case 0b000000: op_madd(); break;
+    case 0b011011: op_divu1(); break;
+    case 0b010010: op_mflo1(); break;
     default:
-        log("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.sa);
+        log("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.funct);
 		std::exit(1);
     }
 }
@@ -870,3 +964,4 @@ template uint16_t EmotionEngine::read<uint16_t>(uint32_t);
 template void EmotionEngine::write<uint32_t>(uint32_t, uint32_t);
 template void EmotionEngine::write<uint64_t>(uint32_t, uint64_t);
 template void EmotionEngine::write<uint8_t>(uint32_t, uint8_t);
+template void EmotionEngine::write<uint16_t>(uint32_t, uint16_t);
