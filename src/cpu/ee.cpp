@@ -104,7 +104,7 @@ template <typename T>
 T EmotionEngine::read(uint32_t addr)
 {
     if (addr >= 0x70000000 && addr < 0x70004000) /* Read from scratchpad */
-        return *(uint32_t*)&scratchpad[addr & 0x3FFC];
+        return *(T*)&scratchpad[addr & 0x3FFF];
     else
         return manager->read<T>(addr);
 }
@@ -113,7 +113,7 @@ template <typename T>
 void EmotionEngine::write(uint32_t addr, T data)
 {
     if (addr >= 0x70000000 && addr < 0x70004000)
-        *(uint32_t*)&scratchpad[addr & 0x3FFC] = data;
+        *(T*)&scratchpad[addr & 0x3FFF] = data;
     else
         manager->write<T>(addr, data);
 
