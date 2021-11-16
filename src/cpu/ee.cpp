@@ -4,6 +4,12 @@
 #include <iostream>
 #include <fmt/color.h>
 
+#ifndef NDEBUG
+#define log(x) (void)0
+#else
+#define log(...) fmt::print(__VA_ARGS__)
+#endif
+
 constexpr auto BOLD = fg(fmt::color::green_yellow) | fmt::emphasis::bold;
 
 EmotionEngine::EmotionEngine(ComponentManager* parent)
@@ -45,13 +51,13 @@ void EmotionEngine::fetch_instruction()
     
     /* Update PC */
     pc += 4;
-    fmt::print("PC: {:#x} instruction: {:#x} ", instr.pc, instr.value);
+    log("PC: {:#x} instruction: {:#x} ", instr.pc, instr.value);
 
     /* Skip the delay slot for any BEQ* instructions */
     if (skip_branch_delay)
     {
         skip_branch_delay = false;
-        std::cout << "SKIPPED delay slot\n";
+        log("SKIPPED delay slot\n");
         return;
     }
 
@@ -110,6 +116,8 @@ void EmotionEngine::write(uint32_t addr, T data)
         *(uint32_t*)&scratchpad[addr & 0x3FFC] = data;
     else
         manager->write<T>(addr, data);
+
+    if (scratchpad[0x70003edd & 0x3FFF] == 0x33) __debugbreak();
 }
 
 void EmotionEngine::op_cop0()
@@ -155,7 +163,7 @@ void EmotionEngine::op_mfc0()
     uint16_t rt = (instr.value >> 16) & 0x1F;
 
     gpr[rt].dword[0] = cop0.regs[rd];
-    fmt::print("MFC0: GPR[{:d}] = COP0_REG[{:d}] ({:#x})\n", rt, rd, cop0.regs[rd]);
+    log("MFC0: GPR[{:d}] = COP0_REG[{:d}] ({:#x})\n", rt, rd, cop0.regs[rd]);
 }
 
 void EmotionEngine::op_special()
@@ -196,6 +204,7 @@ void EmotionEngine::op_regimm()
     switch(type)
     {
     case 0b00001: op_bgez(); break;
+    case 0b00000: op_bltz(); break;
     default:
         fmt::print("[ERROR] Unimplemented REGIMM instruction: {:#05b}\n", type);
 		std::exit(1);
@@ -211,10 +220,10 @@ void EmotionEngine::op_sw()
     uint32_t vaddr = offset + gpr[base].word[0];
     uint32_t data = gpr[rt].word[0];
 
-    fmt::print(BOLD, "SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    log(BOLD, "SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
     if ((vaddr & 0b11) != 0)
     {
-        fmt::print("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
+        log("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
         std::exit(1); /* NOTE: SignalException (AddressError) */
     }
     else
@@ -229,8 +238,8 @@ void EmotionEngine::op_sll()
 
     gpr[rd].dword[0] = (uint64_t)(int32_t)(gpr[rt].word[0] << sa);
 
-    if (instr.value == 0) fmt::print("NOP\n");
-    else fmt::print("SLL: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d}\n", rd, rt, gpr[rt].dword[0], sa);
+    if (instr.value == 0) log("NOP\n");
+    else log("SLL: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d}\n", rd, rt, gpr[rt].dword[0], sa);
 }
 
 void EmotionEngine::op_slti()
@@ -242,7 +251,7 @@ void EmotionEngine::op_slti()
     int64_t reg = gpr[rs].dword[0];
     gpr[rt].dword[0] = reg < imm;
     
-    fmt::print("SLTI: GPR[{:d}] = GPR[{:d}] ({:#x}) < {:#x}\n", rt, rs, reg, imm);
+    log("SLTI: GPR[{:d}] = GPR[{:d}] ({:#x}) < {:#x}\n", rt, rs, reg, imm);
 }
 
 void EmotionEngine::op_bne()
@@ -255,7 +264,7 @@ void EmotionEngine::op_bne()
     if (gpr[rs].dword[0] != gpr[rt].dword[0])
         pc += offset - 4;
     
-    fmt::print("BNE: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
+    log("BNE: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
 }
 
 void EmotionEngine::op_ori()
@@ -264,7 +273,7 @@ void EmotionEngine::op_ori()
     uint16_t rt = instr.i_type.rt;
     uint16_t imm = instr.i_type.immediate;
 
-    fmt::print("ORI: GPR[{:d}] = GPR[{:d}] ({:#x}) | {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
+    log("ORI: GPR[{:d}] = GPR[{:d}] ({:#x}) | {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
 
     gpr[rt].dword[0] = gpr[rs].dword[0] | (uint64_t)imm;
 }
@@ -279,7 +288,7 @@ void EmotionEngine::op_addi()
     int64_t reg = gpr[rs].dword[0];
     gpr[rt].dword[0] = reg + imm;
 
-    fmt::print("ADDI: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, reg, imm);
+    log("ADDI: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, reg, imm);
 }
 
 void EmotionEngine::op_lq()
@@ -292,7 +301,7 @@ void EmotionEngine::op_lq()
     gpr[rt].dword[0] = read<uint64_t>(vaddr);
     gpr[rt].dword[1] = read<uint64_t>(vaddr + 8);
 
-    fmt::print("LQ: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x} + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], imm);
+    log("LQ: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x} + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], imm);
 }
 
 void EmotionEngine::op_lui()
@@ -302,7 +311,7 @@ void EmotionEngine::op_lui()
 
     gpr[rt].dword[0] = (int64_t)(int32_t)(imm << 16);
 
-    fmt::print("LUI: GPR[{:d}] = {:#x}\n", rt, gpr[rt].dword[0]);
+    log("LUI: GPR[{:d}] = {:#x}\n", rt, gpr[rt].dword[0]);
 }
 
 void EmotionEngine::op_jr()
@@ -310,12 +319,12 @@ void EmotionEngine::op_jr()
     uint16_t rs = instr.i_type.rs;
     pc = gpr[rs].word[0];
     
-    fmt::print("JR: Jumped to GPR[{:d}] = {:#x}\n", rs, pc);
+    log("JR: Jumped to GPR[{:d}] = {:#x}\n", rs, pc);
 }
 
 void EmotionEngine::op_sync()
 {
-    fmt::print("SYNC\n");
+    log("SYNC\n");
 }
 
 void EmotionEngine::op_lb()
@@ -327,7 +336,7 @@ void EmotionEngine::op_lb()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = (int64_t)read<uint8_t>(vaddr);
 
-    fmt::print(BOLD, "LB: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log(BOLD, "LB: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_swc1()
@@ -339,10 +348,10 @@ void EmotionEngine::op_swc1()
     uint32_t vaddr = offset + gpr[base].word[0];
     uint32_t data = fpr[ft].word[0];
 
-    fmt::print("SWC1: Writing FPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", ft, data, vaddr, base, gpr[base].word[0], offset);
+    log("SWC1: Writing FPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", ft, data, vaddr, base, gpr[base].word[0], offset);
     if ((vaddr & 0b11) != 0)
     {
-        fmt::print("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
+        log("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
         std::exit(1); /* NOTE: SignalException (AddressError) */
     }
     else
@@ -358,7 +367,7 @@ void EmotionEngine::op_lbu()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = read<uint8_t>(vaddr);
 
-    fmt::print(BOLD, "LBU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log(BOLD, "LBU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_ld()
@@ -370,7 +379,7 @@ void EmotionEngine::op_ld()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = read<uint64_t>(vaddr);
 
-    fmt::print(BOLD, "LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log(BOLD, "LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_j()
@@ -379,7 +388,7 @@ void EmotionEngine::op_j()
 
     pc = (pc & 0xF0000000) | (instr_index << 2);
 
-    fmt::print("J: Jumping to PC = {:#x}\n", pc);
+    log("J: Jumping to PC = {:#x}\n", pc);
 }
 
 void EmotionEngine::op_sb()
@@ -391,7 +400,7 @@ void EmotionEngine::op_sb()
     uint32_t vaddr = offset + gpr[base].word[0];
     uint16_t data = gpr[rt].word[0] & 0xFF;
 
-    fmt::print(BOLD, "SB: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    log(BOLD, "SB: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
     write<uint8_t>(vaddr, data);
 }
 
@@ -408,11 +417,11 @@ void EmotionEngine::op_div()
         int32_t r = (int32_t)gpr[rs].word[0] % (int32_t)gpr[rt].word[0];
         hi0 = (int64_t)(int32_t)(r & 0xFFFFFFFF);
 
-        fmt::print("DIV: LO0 = GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x})\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0]);
+        log("DIV: LO0 = GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x})\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0]);
     }
     else
     {
-        fmt::print("[ERROR] DIV: Division by zero!\n");
+        log("[ERROR] DIV: Division by zero!\n");
         std::abort();
     }
 }
@@ -423,7 +432,7 @@ void EmotionEngine::op_mfhi()
 
     gpr[rd].dword[0] = hi0;
 
-    fmt::print("MFHI: GPR[{:d}] = HI0 ({:#x})\n", rd, hi0);
+    log("MFHI: GPR[{:d}] = HI0 ({:#x})\n", rd, hi0);
 }
 
 void EmotionEngine::op_sltu()
@@ -432,7 +441,7 @@ void EmotionEngine::op_sltu()
     uint16_t rs = instr.r_type.rs;
     uint16_t rt = instr.r_type.rt;
 
-    fmt::print("SLTU: GPR[{:d}] = GPR[{:d}] ({:#x}) < GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    log("SLTU: GPR[{:d}] = GPR[{:d}] ({:#x}) < GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
     gpr[rd].dword[0] = gpr[rs].dword[0] < gpr[rt].dword[0];
 }
 
@@ -446,7 +455,7 @@ void EmotionEngine::op_blez()
     if (reg <= 0)
         pc += offset - 4;
 
-    fmt::print("BLEZ: IF GPR[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
+    log("BLEZ: IF GPR[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
 void EmotionEngine::op_subu()
@@ -459,7 +468,7 @@ void EmotionEngine::op_subu()
     int32_t reg2 = gpr[rt].dword[0];
     gpr[rd].dword[0] = reg1 - reg2;
 
-    fmt::print("SUBU: GPR[{:d}] = GPR[{:d}] ({:#x}) - GPR[{:d}] ({:#x})\n", rd, rs, reg1, rt, reg2);
+    log("SUBU: GPR[{:d}] = GPR[{:d}] ({:#x}) - GPR[{:d}] ({:#x})\n", rd, rs, reg1, rt, reg2);
 }
 
 void EmotionEngine::op_bgtz()
@@ -472,7 +481,7 @@ void EmotionEngine::op_bgtz()
     if (reg > 0)
         pc += offset - 4;
 
-    fmt::print("BGTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
+    log("BGTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
 void EmotionEngine::op_movn()
@@ -483,7 +492,7 @@ void EmotionEngine::op_movn()
 
     if (gpr[rt].dword[0] != 0) gpr[rd].dword[0] = gpr[rs].dword[0];
 
-    fmt::print("MOVN: IF GPR[{:d}] ({:#x}) != 0 THEN GPR[{:d}] = GPR[{:d}] ({:#x})\n", rt, gpr[rt].dword[0], rd, rs, gpr[rs].dword[0]);
+    log("MOVN: IF GPR[{:d}] ({:#x}) != 0 THEN GPR[{:d}] = GPR[{:d}] ({:#x})\n", rt, gpr[rt].dword[0], rd, rs, gpr[rs].dword[0]);
 }
 
 void EmotionEngine::op_slt()
@@ -496,7 +505,7 @@ void EmotionEngine::op_slt()
     int64_t reg2 = gpr[rt].dword[0];
     gpr[rd].dword[0] = reg1 < reg2;
 
-    fmt::print("SLT: GPR[{:d}] = GPR[{:d}] ({:#x}) < GPR[{:d}] ({:#x})\n", rd, rs, reg1, rt, reg2);
+    log("SLT: GPR[{:d}] = GPR[{:d}] ({:#x}) < GPR[{:d}] ({:#x})\n", rd, rs, reg1, rt, reg2);
 }
 
 void EmotionEngine::op_and()
@@ -507,7 +516,7 @@ void EmotionEngine::op_and()
 
     gpr[rd].dword[0] = gpr[rs].dword[0] & gpr[rt].dword[0];
 
-    fmt::print("AND: GPR[{:d}] = GPR[{:d}] ({:#x}) & GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    log("AND: GPR[{:d}] = GPR[{:d}] ({:#x}) & GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
 }
 
 void EmotionEngine::op_srl()
@@ -518,7 +527,7 @@ void EmotionEngine::op_srl()
 
     gpr[rd].dword[0] = (int32_t)(gpr[rt].word[0] >> sa);
 
-    fmt::print("SRL: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].word[0], sa);
+    log("SRL: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].word[0], sa);
 }
 
 void EmotionEngine::op_dsll()
@@ -527,8 +536,21 @@ void EmotionEngine::op_dsll()
     uint16_t rd = instr.r_type.rd;
     uint16_t rt = instr.r_type.rt;
 
-    fmt::print("DSLL: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d} + 32\n", rd, rt, gpr[rt].dword[0], sa);
+    log("DSLL: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d} + 32\n", rd, rt, gpr[rt].dword[0], sa);
     gpr[rd].dword[0] = gpr[rt].dword[0] << sa;
+}
+
+void EmotionEngine::op_bltz()
+{
+    int32_t imm = (int16_t)instr.i_type.immediate;
+    uint16_t rs = instr.i_type.rs;
+
+    int32_t offset = imm << 2;
+    int64_t reg = gpr[rs].dword[0];
+    if (reg < 0)
+        pc += offset - 4;
+
+    log("BLTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
 void EmotionEngine::op_lhu()
@@ -540,7 +562,7 @@ void EmotionEngine::op_lhu()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = read<uint16_t>(vaddr);
 
-    fmt::print(BOLD, "LHU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log(BOLD, "LHU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_dsll32()
@@ -549,7 +571,7 @@ void EmotionEngine::op_dsll32()
     uint16_t rd = instr.r_type.rd;
     uint16_t rt = instr.r_type.rt;
 
-    fmt::print("DSLL32: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d} + 32\n", rd, rt, gpr[rt].dword[0], sa);
+    log("DSLL32: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d} + 32\n", rd, rt, gpr[rt].dword[0], sa);
     gpr[rd].dword[0] = gpr[rt].dword[0] << (sa + 32);
 }
 
@@ -562,7 +584,7 @@ void EmotionEngine::op_dsra32()
     int64_t reg = gpr[rt].dword[0];
     gpr[rd].dword[0] = reg >> (sa + 32);
         
-    fmt::print("DSRA32: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d} + 32\n", rd, rt, reg, sa);
+    log("DSRA32: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d} + 32\n", rd, rt, reg, sa);
 }
 
 void EmotionEngine::op_lw()
@@ -574,7 +596,7 @@ void EmotionEngine::op_lw()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = (int32_t)read<uint32_t>(vaddr);
 
-    fmt::print(BOLD, "LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log(BOLD, "LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_addiu()
@@ -586,12 +608,12 @@ void EmotionEngine::op_addiu()
     int32_t reg = gpr[rs].word[0];
     gpr[rt].dword[0] = reg + imm;
 
-    fmt::print("ADDIU: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, reg, imm);
+    log("ADDIU: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, reg, imm);
 }
 
 void EmotionEngine::op_tlbwi()
 {
-    fmt::print("TLBWI\n");
+    log("TLBWI\n");
 }
 
 void EmotionEngine::op_mtc0()
@@ -601,7 +623,7 @@ void EmotionEngine::op_mtc0()
 
     cop0.regs[rd] = gpr[rt].word[0];
     
-    fmt::print("MTC0: COP0[{:d}] = GPR[{:d}] ({:#x})\n", rd, rt, gpr[rt].word[0]); 
+    log("MTC0: COP0[{:d}] = GPR[{:d}] ({:#x})\n", rd, rt, gpr[rt].word[0]); 
 }
 
 void EmotionEngine::op_mmi()
@@ -610,7 +632,7 @@ void EmotionEngine::op_mmi()
     {
     case 0b10000: op_madd1(); break;
     default:
-        fmt::print("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.sa);
+        log("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.sa);
 		std::exit(1);
     }
 }
@@ -629,7 +651,7 @@ void EmotionEngine::op_madd1()
     hi1 = (int64_t)(int32_t)(result >> 32);
     gpr[rd].dword[0] = (int64_t)lo1;
 
-    fmt::print("MADD1: GPR[{:d}] = LO1 = {:#x} and HI1 = {:#x}\n", lo1, hi1);
+    log("MADD1: GPR[{:d}] = LO1 = {:#x} and HI1 = {:#x}\n", lo1, hi1);
 }
 
 void EmotionEngine::op_jalr()
@@ -640,7 +662,7 @@ void EmotionEngine::op_jalr()
     gpr[rd].dword[0] = pc;
     pc = gpr[rs].word[0];
 
-    fmt::print("JALR: Jumping to PC = GPR[{:d}] ({:#x}) with link address {:#x}\n", rs, pc, gpr[rd].dword[0]);
+    log("JALR: Jumping to PC = GPR[{:d}] ({:#x}) with link address {:#x}\n", rs, pc, gpr[rd].dword[0]);
 }
 
 void EmotionEngine::op_sd()
@@ -653,13 +675,13 @@ void EmotionEngine::op_sd()
     uint64_t data = gpr[rt].dword[0];
     if ((vaddr & 0b111) != 0)
     {
-        fmt::print("[ERROR] SD: Address {:#x} is not aligned\n", vaddr);
+        log("[ERROR] SD: Address {:#x} is not aligned\n", vaddr);
         std::exit(1); /* NOTE: SignalException (AddressError) */
     }
     else
         write<uint64_t>(vaddr, data);
 
-    fmt::print(BOLD, "SD: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    log(BOLD, "SD: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_jal()
@@ -669,7 +691,7 @@ void EmotionEngine::op_jal()
     gpr[31].dword[0] = pc;
     pc = (pc & 0xF0000000) | (instr_index << 2);
     
-    fmt::print("JAL: Jumping to PC = {:#x} with return link address {:#x}\n", pc, gpr[31].dword[0]);
+    log("JAL: Jumping to PC = {:#x} with return link address {:#x}\n", pc, gpr[31].dword[0]);
 }
 
 void EmotionEngine::op_sra()
@@ -681,7 +703,7 @@ void EmotionEngine::op_sra()
     int32_t reg = gpr[rt].word[0];
     gpr[rd].dword[0] = reg >> sa;
 
-    fmt::print("SRA: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].word[0], sa);
+    log("SRA: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].word[0], sa);
 }
 
 void EmotionEngine::op_bgez()
@@ -694,7 +716,7 @@ void EmotionEngine::op_bgez()
     if (reg >= 0)
         pc += offset - 4;
 
-    fmt::print("BGEZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, reg, offset);
+    log("BGEZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, reg, offset);
 }
 
 void EmotionEngine::op_addu()
@@ -707,7 +729,7 @@ void EmotionEngine::op_addu()
     int32_t reg2 = gpr[rt].dword[0];
     gpr[rd].dword[0] = reg1 + reg2;
 
-    fmt::print("ADDU: GPR[{:d}] = GPR[{:d}] ({:#x}) + GPR[{:d}] ({:#x})\n", rd, rs, reg1, rt, reg2);
+    log("ADDU: GPR[{:d}] = GPR[{:d}] ({:#x}) + GPR[{:d}] ({:#x})\n", rd, rs, reg1, rt, reg2);
 }
 
 void EmotionEngine::op_daddu()
@@ -720,7 +742,7 @@ void EmotionEngine::op_daddu()
     int64_t reg2 = gpr[rt].dword[0];
     gpr[rd].dword[0] = reg1 + reg2;
 
-    fmt::print("DADDU: GPR[{:d}] = GPR[{:d}] ({:#x}) + GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    log("DADDU: GPR[{:d}] = GPR[{:d}] ({:#x}) + GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
 }
 
 void EmotionEngine::op_andi()
@@ -731,7 +753,7 @@ void EmotionEngine::op_andi()
 
     gpr[rt].dword[0] =  gpr[rs].dword[0] & imm;
 
-    fmt::print("ANDI: GPR[{:d}] = GPR[{:d}] ({:#x}) & {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
+    log("ANDI: GPR[{:d}] = GPR[{:d}] ({:#x}) & {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
 }
 
 void EmotionEngine::op_beq()
@@ -744,7 +766,7 @@ void EmotionEngine::op_beq()
     if (gpr[rs].dword[0] == gpr[rt].dword[0])
         pc += offset - 4;
     
-    fmt::print("BEQ: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
+    log("BEQ: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
 }
 
 void EmotionEngine::op_or()
@@ -753,7 +775,7 @@ void EmotionEngine::op_or()
     uint16_t rs = instr.r_type.rs;
     uint16_t rd = instr.r_type.rd;
 
-    fmt::print("OR: GPR[{:d}] = GPR[{:d}] ({:#x}) | GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    log("OR: GPR[{:d}] = GPR[{:d}] ({:#x}) | GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
 
     gpr[rd].dword[0] = gpr[rs].dword[0] | gpr[rt].dword[0];
 }
@@ -768,7 +790,7 @@ void EmotionEngine::op_mult()
     gpr[rd].dword[0] = lo0 = (int32_t)(result & 0xFFFFFFFF);
     hi0 = (int32_t)(result >> 32);
 
-    fmt::print("MULT: GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", rd, lo0, hi0);
+    log("MULT: GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", rd, lo0, hi0);
 }
 
 void EmotionEngine::op_divu()
@@ -781,11 +803,11 @@ void EmotionEngine::op_divu()
         lo0 = (int64_t)(int32_t)(gpr[rs].word[0] / gpr[rt].word[0]);
         hi0 = (int64_t)(int32_t)(gpr[rs].word[0] % gpr[rt].word[0]);
         
-        fmt::print("DIVU: LO0 = GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x})\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0]);
+        log("DIVU: LO0 = GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x})\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0]);
     }
     else
     {
-        fmt::print("[ERROR] DIVU: Division by zero!\n");
+        log("[ERROR] DIVU: Division by zero!\n");
         std::abort();
     }
 }
@@ -802,7 +824,7 @@ void EmotionEngine::op_beql()
     else
         skip_branch_delay = true;
 
-    fmt::print("BEQL: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);
+    log("BEQL: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);
 }
 
 void EmotionEngine::op_mflo()
@@ -811,7 +833,7 @@ void EmotionEngine::op_mflo()
 
     gpr[rd].dword[0] = lo0;
 
-    fmt::print("MFLO: GPR[{:d}] = LO0 ({:#x})\n", rd, lo0);
+    log("MFLO: GPR[{:d}] = LO0 ({:#x})\n", rd, lo0);
 }
 
 void EmotionEngine::op_sltiu()
@@ -822,7 +844,7 @@ void EmotionEngine::op_sltiu()
     
     gpr[rt].dword[0] = gpr[rs].dword[0] < imm;
 
-    fmt::print("SLTIU: GPR[{:d}] = GPR[{:d}] ({:#x}) < {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
+    log("SLTIU: GPR[{:d}] = GPR[{:d}] ({:#x}) < {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
 }
 
 void EmotionEngine::op_bnel()
@@ -837,7 +859,7 @@ void EmotionEngine::op_bnel()
     else
         skip_branch_delay = true;
 
-    fmt::print("BNEL: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);
+    log("BNEL: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);
 }
 
 /* Template definitions. */

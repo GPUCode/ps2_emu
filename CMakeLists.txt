@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.10)
 # Set the project name
 set(PROJECT_NAME gcnemu)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_BUILD_TYPE, Debug)
 
 project(${PROJECT_NAME})
 
