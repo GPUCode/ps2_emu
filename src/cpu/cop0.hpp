@@ -51,6 +51,24 @@ union COP0Status {
     };
 };
 
+union COP0Cause {
+    uint32_t value;
+    struct {
+        uint32_t : 2;
+        uint32_t exccode : 5;
+        uint32_t : 3;
+        uint32_t ip23 : 2;
+        uint32_t siop : 1;
+        uint32_t : 2;
+        uint32_t ip7 : 1;
+        uint32_t exc2 : 3;
+        uint32_t : 9;
+        uint32_t ce : 2;
+        uint32_t bd2 : 1;
+        uint32_t bd : 1;
+    };
+};
+
 enum OperatingMode {
     USER_MODE = 0b10,
     SUPERVISOR_MODE = 0b01,
@@ -60,7 +78,6 @@ enum OperatingMode {
 /* The COP0 registers */
 union COP0 {
 	uint32_t regs[32] = {0};
-
 	struct {
         uint32_t index;
         uint32_t random;
@@ -75,7 +92,7 @@ union COP0 {
         uint32_t entryhi;
         uint32_t compare;
         COP0Status status;
-        uint32_t cause;
+        COP0Cause cause;
         uint32_t epc;
         uint32_t prid;
         uint32_t config;

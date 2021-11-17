@@ -51,6 +51,15 @@ void EmotionEngine::fetch_instruction()
 {
     /* Handle branch delay slots by prefetching the next one */
     instr = next_instr;
+
+    /* If the current instruction is in a branch delay slot */
+    if (is_delay_slot)
+    {
+        instr.is_delay_slot = true;
+        is_delay_slot = false;
+    }
+
+    /* Read next instruction */
     next_instr.value = read<uint32_t>(pc);
     next_instr.pc = pc;
     
@@ -107,6 +116,45 @@ void EmotionEngine::fetch_instruction()
     }
 
     cop0.regs[9]++;
+}
+
+void EmotionEngine::exception(Exception exception)
+{
+    fmt::print("[INFO] Exception occured of type {:d}!\n", (uint32_t)exception);
+    
+    ExceptionVector vector = ExceptionVector::V_COMMON;
+    cop0.cause.exccode = (uint32_t)exception;
+    if (!cop0.status.exl)
+    {
+        bool in_delay_slot = instr.is_delay_slot;
+        cop0.epc = instr.pc - 4 * in_delay_slot;
+        cop0.cause.bd = in_delay_slot;
+
+        /* Select appropriate exception vector */
+        switch (exception)
+        {
+        case Exception::TLBLoad: 
+        case Exception::TLBStore:
+            vector = ExceptionVector::V_TLB_REFILL; 
+            break;
+        case Exception::Interrupt: 
+            vector = ExceptionVector::V_INTERRUPT; 
+            break;
+        default: 
+            vector = ExceptionVector::V_COMMON; 
+            break;
+        }
+
+        /* Enter kernel mode */
+        cop0.status.exl = true;
+    }
+
+    /* We do this to avoid branches */
+    pc = 0x80000000 + cop0.status.bev * 0x3FC00200 + (uint32_t)vector;
+    
+    /* Insert the instruction in our pipeline */
+    next_instr.value = read<uint32_t>(pc);
+    next_instr.pc = pc;
 }
 
 template <typename T>
@@ -231,10 +279,10 @@ void EmotionEngine::op_sw()
     uint32_t data = gpr[rt].word[0];
 
     log("SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
-    if ((vaddr & 0b11) != 0)
+    if (vaddr & 0x3)
     {
         log("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
-        std::exit(1); /* NOTE: SignalException (AddressError) */
+        exception(Exception::AddrErrorStore);
     }
     else
         write<uint32_t>(vaddr, data);
@@ -274,6 +322,7 @@ void EmotionEngine::op_bne()
     if (gpr[rs].dword[0] != gpr[rt].dword[0])
         pc += offset - 4;
     
+    is_delay_slot = true;
     log("BNE: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
 }
 
@@ -329,6 +378,7 @@ void EmotionEngine::op_jr()
     uint16_t rs = instr.i_type.rs;
     pc = gpr[rs].word[0];
     
+    is_delay_slot = true;
     log("JR: Jumped to GPR[{:d}] = {:#x}\n", rs, pc);
 }
 
@@ -387,9 +437,15 @@ void EmotionEngine::op_ld()
     int16_t offset = (int16_t)instr.i_type.immediate;
 
     uint32_t vaddr = offset + gpr[base].word[0];
-    gpr[rt].dword[0] = read<uint64_t>(vaddr);
-
+    
     log("LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    if (vaddr & 0x7)
+    {
+        log("[ERROR] LD: Address {:#x} is not aligned\n", vaddr);
+        exception(Exception::AddrErrorLoad);
+    }
+    else
+        gpr[rt].dword[0] = read<uint64_t>(vaddr);
 }
 
 void EmotionEngine::op_j()
@@ -398,6 +454,7 @@ void EmotionEngine::op_j()
 
     pc = (pc & 0xF0000000) | (instr_index << 2);
 
+    is_delay_slot = true;
     log("J: Jumping to PC = {:#x}\n", pc);
 }
 
@@ -465,6 +522,7 @@ void EmotionEngine::op_blez()
     if (reg <= 0)
         pc += offset - 4;
 
+    is_delay_slot = true;
     log("BLEZ: IF GPR[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
@@ -491,6 +549,7 @@ void EmotionEngine::op_bgtz()
     if (reg > 0)
         pc += offset - 4;
 
+    is_delay_slot = true;
     log("BGTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
@@ -560,6 +619,7 @@ void EmotionEngine::op_bltz()
     if (reg < 0)
         pc += offset - 4;
 
+    is_delay_slot = true;
     log("BLTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
@@ -573,10 +633,10 @@ void EmotionEngine::op_sh()
     uint16_t data = gpr[rt].word[0] & 0xFFFF;
 
     log("SH: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
-    if ((vaddr & 1) != 0)
+    if (vaddr & 0x1)
     {
         log("[ERROR] SH: Address {:#x} is not aligned\n", vaddr);
-        std::exit(1); /* NOTE: SignalException (AddressError) */
+        exception(Exception::AddrErrorStore);
     }
     else
         write<uint16_t>(vaddr, data);
@@ -733,9 +793,15 @@ void EmotionEngine::op_lhu()
     int16_t offset = (int16_t)instr.i_type.immediate;
 
     uint32_t vaddr = offset + gpr[base].word[0];
-    gpr[rt].dword[0] = read<uint16_t>(vaddr);
 
     log("LHU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    if (vaddr & 0x1)
+    {
+        log("[ERROR] LHU: Address {:#x} is not aligned\n", vaddr);
+        exception(Exception::AddrErrorLoad);
+    }
+    else
+        gpr[rt].dword[0] = read<uint16_t>(vaddr);
 }
 
 void EmotionEngine::op_dsll32()
@@ -767,9 +833,15 @@ void EmotionEngine::op_lw()
     int16_t offset = (int16_t)instr.i_type.immediate;
 
     uint32_t vaddr = offset + gpr[base].word[0];
-    gpr[rt].dword[0] = (int32_t)read<uint32_t>(vaddr);
 
     log("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    if (vaddr & 0x7)
+    {
+        log("[ERROR] LW: Address {:#x} is not aligned\n", vaddr);
+        exception(Exception::AddrErrorLoad);
+    }
+    else
+        gpr[rt].dword[0] = (int32_t)read<uint32_t>(vaddr);
 }
 
 void EmotionEngine::op_addiu()
@@ -839,6 +911,7 @@ void EmotionEngine::op_jalr()
     gpr[rd].dword[0] = pc;
     pc = gpr[rs].word[0];
 
+    is_delay_slot = true;
     log("JALR: Jumping to PC = GPR[{:d}] ({:#x}) with link address {:#x}\n", rs, pc, gpr[rd].dword[0]);
 }
 
@@ -850,15 +923,15 @@ void EmotionEngine::op_sd()
 
     uint32_t vaddr = offset + gpr[base].word[0];
     uint64_t data = gpr[rt].dword[0];
-    if ((vaddr & 0b111) != 0)
+
+    log("SD: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    if (vaddr & 0x7)
     {
         log("[ERROR] SD: Address {:#x} is not aligned\n", vaddr);
-        std::exit(1); /* NOTE: SignalException (AddressError) */
+        exception(Exception::AddrErrorStore);
     }
     else
         write<uint64_t>(vaddr, data);
-
-    log("SD: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_jal()
@@ -868,6 +941,7 @@ void EmotionEngine::op_jal()
     gpr[31].dword[0] = pc;
     pc = (pc & 0xF0000000) | (instr_index << 2);
     
+    is_delay_slot = true;
     log("JAL: Jumping to PC = {:#x} with return link address {:#x}\n", pc, gpr[31].dword[0]);
 }
 
@@ -893,6 +967,7 @@ void EmotionEngine::op_bgez()
     if (reg >= 0)
         pc += offset - 4;
 
+    is_delay_slot = true;
     log("BGEZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, reg, offset);
 }
 
@@ -943,6 +1018,7 @@ void EmotionEngine::op_beq()
     if (gpr[rs].dword[0] == gpr[rt].dword[0])
         pc += offset - 4;
     
+    is_delay_slot = true;
     log("BEQ: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
 }
 
@@ -1003,6 +1079,7 @@ void EmotionEngine::op_beql()
     else
         skip_branch_delay = true;
 
+    is_delay_slot = !skip_branch_delay;
     log("BEQL: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);
 }
 
@@ -1038,6 +1115,7 @@ void EmotionEngine::op_bnel()
     else
         skip_branch_delay = true;
 
+    is_delay_slot = !skip_branch_delay;
     log("BNEL: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);
 }
 

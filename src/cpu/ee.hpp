@@ -29,7 +29,9 @@ struct Instruction {
             uint32_t opcode : 6;
         } r_type;
     };
+    
     uint32_t pc;
+    bool is_delay_slot = false;
 
     Instruction operator=(const Instruction& instr)
     {
@@ -58,6 +60,29 @@ constexpr const char* const REG[] =
     "gp", "sp", "fp", "ra"
 };
 
+enum class ExceptionVector
+{
+    V_TLB_REFILL = 0x0,
+    V_COMMON = 0x180,
+    V_INTERRUPT = 0x200
+};
+
+enum class Exception
+{
+    Interrupt = 0,
+    TLBModified = 1,
+    TLBLoad = 2,
+    TLBStore = 3,
+    AddrErrorLoad = 4,
+    AddrErrorStore = 5,
+    Syscall = 8,
+    Break = 9,
+    Reserved = 10,
+    CopUnusable = 11,
+    Overflow = 12,
+    Trap = 13,
+};
+
 class ComponentManager;
 
 /* A class implemeting the MIPS R5900 CPU. */
@@ -70,6 +95,7 @@ public:
     void tick();
     void reset_state();
     void fetch_instruction();
+    void exception(Exception exception);
 
     /* Memory operations */
     template <typename T>
@@ -113,6 +139,7 @@ protected:
     uint64_t fcr0, fcr31;
 
     bool skip_branch_delay = false;
+    bool is_delay_slot = false;
 
     /* Scratchpad */
     uint8_t scratchpad[16 * 1024];
