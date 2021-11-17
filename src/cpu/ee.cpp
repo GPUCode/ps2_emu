@@ -1,23 +1,28 @@
 #include <cpu/ee.hpp>
 #include <common/manager.hpp>
-#include <bitset>
-#include <iostream>
 #include <fmt/color.h>
 
 #ifndef NDEBUG
 #define log(x) (void)0
 #else
-#define log(...) fmt::print(__VA_ARGS__)
+constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
+#define log(...) fmt::print(disassembly, __VA_ARGS__)
 #endif
-
-constexpr auto BOLD = fg(fmt::color::green_yellow) | fmt::emphasis::bold;
 
 EmotionEngine::EmotionEngine(ComponentManager* parent)
 {
     manager = parent;
 
+    /* Open output log */
+    disassembly = std::fopen("disassembly.log", "w");
+
     /* Reset CPU state. */
     reset_state();
+}
+
+EmotionEngine::~EmotionEngine()
+{
+    std::fclose(disassembly);
 }
 
 void EmotionEngine::tick()
@@ -94,6 +99,8 @@ void EmotionEngine::fetch_instruction()
     case 0b100101: op_lhu(); break;
     case 0b101001: op_sh(); break;
     case 0b001110: op_xori(); break;
+    case 0b011001: op_daddiu(); break;
+    case 0b011111: op_sq(); break;
     default:
         fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
         std::abort();
@@ -193,6 +200,8 @@ void EmotionEngine::op_special()
     case 0b111111: op_dsra32(); break;
     case 0b111000: op_dsll(); break;
     case 0b010111: op_dsrav(); break;
+    case 0b001010: op_movz(); break;
+    case 0b010100: op_dsllv(); break;
     default:
         fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		std::exit(1);
@@ -221,7 +230,7 @@ void EmotionEngine::op_sw()
     uint32_t vaddr = offset + gpr[base].word[0];
     uint32_t data = gpr[rt].word[0];
 
-    log(BOLD, "SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    log("SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
     if ((vaddr & 0b11) != 0)
     {
         log("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
@@ -337,7 +346,7 @@ void EmotionEngine::op_lb()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = (int64_t)read<uint8_t>(vaddr);
 
-    log(BOLD, "LB: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log("LB: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_swc1()
@@ -368,7 +377,7 @@ void EmotionEngine::op_lbu()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = read<uint8_t>(vaddr);
 
-    log(BOLD, "LBU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log("LBU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_ld()
@@ -380,7 +389,7 @@ void EmotionEngine::op_ld()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = read<uint64_t>(vaddr);
 
-    log(BOLD, "LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log("LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_j()
@@ -401,7 +410,7 @@ void EmotionEngine::op_sb()
     uint32_t vaddr = offset + gpr[base].word[0];
     uint16_t data = gpr[rt].word[0] & 0xFF;
 
-    log(BOLD, "SB: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    log("SB: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
     write<uint8_t>(vaddr, data);
 }
 
@@ -563,7 +572,7 @@ void EmotionEngine::op_sh()
     uint32_t vaddr = offset + gpr[base].word[0];
     uint16_t data = gpr[rt].word[0] & 0xFFFF;
 
-    log(BOLD, "SH: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    log("SH: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
     if ((vaddr & 1) != 0)
     {
         log("[ERROR] SH: Address {:#x} is not aligned\n", vaddr);
@@ -629,6 +638,81 @@ void EmotionEngine::op_xori()
     gpr[rt].dword[0] = gpr[rs].dword[0] ^ imm;
 }
 
+void EmotionEngine::op_mult1()
+{
+    uint16_t rt = instr.r_type.rt;
+    uint16_t rs = instr.r_type.rs;
+    uint16_t rd = instr.r_type.rd;
+
+    int64_t reg1 = (int64_t)gpr[rs].dword[0];
+    int64_t reg2 = (int64_t)gpr[rt].dword[0];
+    int64_t result = reg1 * reg2;
+    gpr[rd].dword[0] = lo1 = (int32_t)(result & 0xFFFFFFFF);
+    hi1 = (int32_t)(result >> 32);
+
+    log("MULT1: GPR[{:d}] ({:#x}) * GPR[{:d}] ({:#x}) = {:#x} OUTPUT GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", rs, reg1, rt, reg2, result, rd, lo1, hi1);
+}
+
+void EmotionEngine::op_movz()
+{
+    uint16_t rs = instr.r_type.rs;
+    uint16_t rd = instr.r_type.rd;
+    uint16_t rt = instr.r_type.rt;
+
+    if (gpr[rt].dword[0] == 0) 
+        gpr[rd].dword[0] = gpr[rs].dword[0];
+
+    log("MOVZ: IF GPR[{:d}] == 0 THEN GPR[{:d}] = GPR[{:d}] ({:#x})\n", rt, rd, rs, gpr[rs].dword[0]);
+}
+
+void EmotionEngine::op_dsllv()
+{
+    uint16_t rs = instr.r_type.rs;
+    uint16_t rd = instr.r_type.rd;
+    uint16_t rt = instr.r_type.rt;
+
+    uint64_t reg = gpr[rt].dword[0];
+    uint16_t sa = gpr[rs].word[0] & 0x3F;
+    gpr[rd].dword[0] = reg << sa;
+
+    log("DSLLV: GPR[{:d}] = GPR[{:d}] ({:#x}) << GPR[{:d}] ({:d})\n", rd, rt, reg, rs, sa);
+}
+
+void EmotionEngine::op_daddiu()
+{
+    uint16_t rs = instr.i_type.rs;
+    uint16_t rt = instr.i_type.rt;
+    int16_t offset = (int16_t)instr.i_type.immediate;
+
+    log("DADDIU: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, gpr[rs].dword[0], offset);
+
+    int64_t reg = gpr[rs].dword[0];
+    gpr[rt].dword[0] = reg + offset;
+}
+
+void EmotionEngine::op_sq()
+{
+    uint16_t base = instr.i_type.rs;
+    uint16_t rt = instr.i_type.rt;
+    int16_t offset = (int16_t)instr.i_type.immediate;
+
+    uint32_t vaddr = offset + gpr[base].word[0];
+    uint64_t data1 = gpr[rt].dword[0];
+    uint64_t data2 = gpr[rt].dword[1];
+
+    log("SQ: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data1, vaddr, base, gpr[base].word[0], offset);
+    if ((vaddr & 0xF) != 0)
+    {
+        log("[ERROR] SQ: Address {:#x} is not aligned\n", vaddr);
+        std::exit(1); /* NOTE: SignalException (AddressError) */
+    }
+    else
+    {
+        write<uint64_t>(vaddr, data1);
+        write<uint64_t>(vaddr + 8, data2);
+    }
+}
+
 void EmotionEngine::op_dsrav()
 {
     uint16_t rs = instr.r_type.rs;
@@ -651,7 +735,7 @@ void EmotionEngine::op_lhu()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = read<uint16_t>(vaddr);
 
-    log(BOLD, "LHU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log("LHU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_dsll32()
@@ -685,7 +769,7 @@ void EmotionEngine::op_lw()
     uint32_t vaddr = offset + gpr[base].word[0];
     gpr[rt].dword[0] = (int32_t)read<uint32_t>(vaddr);
 
-    log(BOLD, "LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+    log("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_addiu()
@@ -723,6 +807,7 @@ void EmotionEngine::op_mmi()
     case 0b000000: op_madd(); break;
     case 0b011011: op_divu1(); break;
     case 0b010010: op_mflo1(); break;
+    case 0b011000: op_mult1(); break;
     default:
         log("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.funct);
 		std::exit(1);
@@ -773,7 +858,7 @@ void EmotionEngine::op_sd()
     else
         write<uint64_t>(vaddr, data);
 
-    log(BOLD, "SD: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
+    log("SD: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
 }
 
 void EmotionEngine::op_jal()

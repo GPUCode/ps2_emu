@@ -64,7 +64,7 @@ class ComponentManager;
 class EmotionEngine {
 public:
     EmotionEngine(ComponentManager* parent);
-    ~EmotionEngine() = default;
+    ~EmotionEngine();
 
     /* CPU functionality. */
     void tick();
@@ -95,7 +95,8 @@ public:
     void op_slt(); void op_and(); void op_srl(); void op_dsll32();
     void op_dsra32(); void op_dsll(); void op_lhu(); void op_bltz();
     void op_sh(); void op_madd(); void op_divu1(); void op_mflo1();
-    void op_dsrav(); void op_xori();
+    void op_dsrav(); void op_xori(); void op_mult1(); void op_movz();
+    void op_dsllv(); void op_daddiu(); void op_sq();
 
 protected:
     ComponentManager* manager;
@@ -118,4 +119,6 @@ protected:
 
     /* Coprocessors */
     COP0 cop0;
+
+    std::FILE* disassembly;
 };
