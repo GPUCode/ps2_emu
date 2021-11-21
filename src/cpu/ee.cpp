@@ -14,7 +14,7 @@ EmotionEngine::EmotionEngine(ComponentManager* parent)
     manager = parent;
 
     /* Open output log */
-    disassembly = std::fopen("disassembly.log", "w");
+    disassembly = std::fopen("disassembly2.log", "w");
 
     /* Reset CPU state. */
     reset_state();
@@ -51,13 +51,6 @@ void EmotionEngine::fetch_instruction()
 {
     /* Handle branch delay slots by prefetching the next one */
     instr = next_instr;
-
-    /* If the current instruction is in a branch delay slot */
-    if (is_delay_slot)
-    {
-        instr.is_delay_slot = true;
-        is_delay_slot = false;
-    }
 
     /* Read next instruction */
     next_instr.value = read<uint32_t>(pc);
@@ -121,7 +114,7 @@ void EmotionEngine::fetch_instruction()
 void EmotionEngine::exception(Exception exception)
 {
     fmt::print("[INFO] Exception occured of type {:d}!\n", (uint32_t)exception);
-    
+
     ExceptionVector vector = ExceptionVector::V_COMMON;
     cop0.cause.exccode = (uint32_t)exception;
     if (!cop0.status.exl)
@@ -155,6 +148,7 @@ void EmotionEngine::exception(Exception exception)
     /* Insert the instruction in our pipeline */
     next_instr.value = read<uint32_t>(pc);
     next_instr.pc = pc;
+    pc += 4;
 }
 
 template <typename T>
@@ -322,7 +316,7 @@ void EmotionEngine::op_bne()
     if (gpr[rs].dword[0] != gpr[rt].dword[0])
         pc += offset - 4;
     
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("BNE: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
 }
 
@@ -378,7 +372,7 @@ void EmotionEngine::op_jr()
     uint16_t rs = instr.i_type.rs;
     pc = gpr[rs].word[0];
     
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("JR: Jumped to GPR[{:d}] = {:#x}\n", rs, pc);
 }
 
@@ -454,7 +448,7 @@ void EmotionEngine::op_j()
 
     pc = (pc & 0xF0000000) | (instr_index << 2);
 
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("J: Jumping to PC = {:#x}\n", pc);
 }
 
@@ -522,7 +516,7 @@ void EmotionEngine::op_blez()
     if (reg <= 0)
         pc += offset - 4;
 
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("BLEZ: IF GPR[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
@@ -549,7 +543,7 @@ void EmotionEngine::op_bgtz()
     if (reg > 0)
         pc += offset - 4;
 
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("BGTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
@@ -619,7 +613,7 @@ void EmotionEngine::op_bltz()
     if (reg < 0)
         pc += offset - 4;
 
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("BLTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
 }
 
@@ -835,7 +829,7 @@ void EmotionEngine::op_lw()
     uint32_t vaddr = offset + gpr[base].word[0];
 
     log("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
-    if (vaddr & 0x7)
+    if (vaddr & 0x3)
     {
         log("[ERROR] LW: Address {:#x} is not aligned\n", vaddr);
         exception(Exception::AddrErrorLoad);
@@ -911,7 +905,7 @@ void EmotionEngine::op_jalr()
     gpr[rd].dword[0] = pc;
     pc = gpr[rs].word[0];
 
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("JALR: Jumping to PC = GPR[{:d}] ({:#x}) with link address {:#x}\n", rs, pc, gpr[rd].dword[0]);
 }
 
@@ -941,7 +935,7 @@ void EmotionEngine::op_jal()
     gpr[31].dword[0] = pc;
     pc = (pc & 0xF0000000) | (instr_index << 2);
     
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("JAL: Jumping to PC = {:#x} with return link address {:#x}\n", pc, gpr[31].dword[0]);
 }
 
@@ -967,7 +961,7 @@ void EmotionEngine::op_bgez()
     if (reg >= 0)
         pc += offset - 4;
 
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("BGEZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, reg, offset);
 }
 
@@ -1018,7 +1012,7 @@ void EmotionEngine::op_beq()
     if (gpr[rs].dword[0] == gpr[rt].dword[0])
         pc += offset - 4;
     
-    is_delay_slot = true;
+    next_instr.is_delay_slot = true;
     log("BEQ: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
 }
 
@@ -1042,6 +1036,7 @@ void EmotionEngine::op_mult()
     int64_t reg1 = (int64_t)gpr[rs].dword[0];
     int64_t reg2 = (int64_t)gpr[rt].dword[0];
     int64_t result = reg1 * reg2;
+    
     gpr[rd].dword[0] = lo0 = (int32_t)(result & 0xFFFFFFFF);
     hi0 = (int32_t)(result >> 32);
 
@@ -1079,7 +1074,7 @@ void EmotionEngine::op_beql()
     else
         skip_branch_delay = true;
 
-    is_delay_slot = !skip_branch_delay;
+    next_instr.is_delay_slot = !skip_branch_delay;
     log("BEQL: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);
 }
 
@@ -1115,7 +1110,7 @@ void EmotionEngine::op_bnel()
     else
         skip_branch_delay = true;
 
-    is_delay_slot = !skip_branch_delay;
+    next_instr.is_delay_slot = !skip_branch_delay;
     log("BNEL: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);
 }
 

@@ -139,7 +139,6 @@ protected:
     uint64_t fcr0, fcr31;
 
     bool skip_branch_delay = false;
-    bool is_delay_slot = false;
 
     /* Scratchpad */
     uint8_t scratchpad[16 * 1024];
