@@ -28,7 +28,7 @@ int main()
 
     /* Move ComponentManger to its own thread for maximum performance. */
     ComponentManager manager;
-    std::thread thread([&]() { while (true) { manager.tick(); } });
+    std::thread thread([&]() { while (!manager.stop_thread) { manager.tick(); } });
 
     while (!glfwWindowShouldClose(window))
     {
@@ -41,6 +41,9 @@ int main()
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    manager.stop_thread = true;
+    thread.join();
 
     glfwTerminate();
     return 0;

@@ -39,10 +39,24 @@ struct Range {
 	uint64_t length = 0;
 };
 
-/* Memory ranges. */
-constexpr Range RAM = Range(0x00000000, 32 * 1024 * 1024LL);
-constexpr Range IO_REGISTERS = Range(0x10000000, 64 * 1024LL);
-constexpr Range VU_MEMORY = Range(0x11000000, 40 * 1024LL);
-constexpr Range GS_PRIV_REGS = Range(0x12000000, 8 * 1024LL);
-constexpr Range IOP_RAM = Range(0x1c000000, 2 * 1024 * 1024LL);
-constexpr Range BIOS = Range(0x1fc00000, 4 * 1024 * 1024LL);
+/* EE memory ranges */
+namespace ee
+{
+	constexpr Range RAM = Range(0x00000000, 32 * 1024 * 1024LL);
+	constexpr Range IO_REGISTERS = Range(0x10000000, 64 * 1024LL);
+	constexpr Range VU_MEMORY = Range(0x11000000, 40 * 1024LL);
+	constexpr Range GS_PRIV_REGS = Range(0x12000000, 8 * 1024LL);
+	constexpr Range IOP_RAM = Range(0x1c000000, 2 * 1024 * 1024LL);
+	constexpr Range BIOS = Range(0x1fc00000, 4 * 1024 * 1024LL);
+};
+
+/* IOP memory ranges */
+namespace iop
+{
+	constexpr Range RAM = Range(0x1c000000, 2 * 1024 * 1024LL);
+	constexpr Range KSEG = Range(0x00000000, 2048 * 1024 * 1024LL);
+	constexpr Range KSEG0 = Range(0x80000000, 512 * 1024 * 1024LL);
+	constexpr Range KSEG1 = Range(0xA0000000, 512 * 1024 * 1024LL);
+	constexpr Range KSEG2 = Range(0xC0000000, 1024 * 1024 * 1024LL);
+	constexpr Range INTERRUPT = Range(0x1f801070, 8);
+};

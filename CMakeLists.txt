@@ -10,7 +10,10 @@ include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
 conan_basic_setup()
 
 # Create executable target
-add_executable(${PROJECT_NAME} src/main.cpp src/common/manager.cpp src/cpu/ee.cpp )
+add_executable(${PROJECT_NAME}	src/main.cpp 
+								src/common/manager.cpp 
+								src/cpu/ee/ee.cpp
+								src/cpu/iop/iop.cpp)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # Link to all the required conan libs
