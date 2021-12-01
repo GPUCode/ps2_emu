@@ -258,7 +258,7 @@ namespace ee
         uint32_t data = gpr[rt].word[0];
 
         log("SW: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
-        if (vaddr & 0x3)
+        if (vaddr & 0x3) [[unlikely]]
         {
             log("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
             exception(Exception::AddrErrorStore);
@@ -388,7 +388,7 @@ namespace ee
         uint32_t data = fpr[ft].word[0];
 
         log("SWC1: Writing FPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", ft, data, vaddr, base, gpr[base].word[0], offset);
-        if ((vaddr & 0b11) != 0)
+        if ((vaddr & 0b11) != 0) [[unlikely]]
         {
             log("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
             std::exit(1); /* NOTE: SignalException (AddressError) */
@@ -418,7 +418,7 @@ namespace ee
         uint32_t vaddr = offset + gpr[base].word[0];
     
         log("LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
-        if (vaddr & 0x7)
+        if (vaddr & 0x7) [[unlikely]]
         {
             log("[ERROR] LD: Address {:#x} is not aligned\n", vaddr);
             exception(Exception::AddrErrorLoad);
@@ -465,7 +465,7 @@ namespace ee
 
             log("DIV: LO0 = GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x})\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0]);
         }
-        else
+        else [[unlikely]]
         {
             log("[ERROR] DIV: Division by zero!\n");
             std::abort();
@@ -612,7 +612,7 @@ namespace ee
         uint16_t data = gpr[rt].word[0] & 0xFFFF;
 
         log("SH: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
-        if (vaddr & 0x1)
+        if (vaddr & 0x1) [[unlikely]]
         {
             log("[ERROR] SH: Address {:#x} is not aligned\n", vaddr);
             exception(Exception::AddrErrorStore);
@@ -650,7 +650,7 @@ namespace ee
 
             log("DIVU1: GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x}) OUTPUT LO1 = {:#x} and HI1 = {:#x}\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0], lo1, hi1);
         }
-        else
+        else [[unlikely]]
         {
             log("[ERROR] DIVU1: Division by zero!\n");
             std::abort();
@@ -774,7 +774,7 @@ namespace ee
         uint32_t vaddr = offset + gpr[base].word[0];
 
         log("LHU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
-        if (vaddr & 0x1)
+        if (vaddr & 0x1) [[unlikely]]
         {
             log("[ERROR] LHU: Address {:#x} is not aligned\n", vaddr);
             exception(Exception::AddrErrorLoad);
@@ -814,7 +814,7 @@ namespace ee
         uint32_t vaddr = offset + gpr[base].word[0];
 
         log("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
-        if (vaddr & 0x3)
+        if (vaddr & 0x3) [[unlikely]]
         {
             log("[ERROR] LW: Address {:#x} is not aligned\n", vaddr);
             exception(Exception::AddrErrorLoad);
@@ -903,7 +903,7 @@ namespace ee
         uint64_t data = gpr[rt].dword[0];
 
         log("SD: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, data, vaddr, base, gpr[base].word[0], offset);
-        if (vaddr & 0x7)
+        if (vaddr & 0x7) [[unlikely]]
         {
             log("[ERROR] SD: Address {:#x} is not aligned\n", vaddr);
             exception(Exception::AddrErrorStore);
@@ -1037,7 +1037,7 @@ namespace ee
         
             log("DIVU: GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x}) OUTPUT LO0 = {:#x} and HI0 = {:#x}\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0], lo0, hi0);
         }
-        else
+        else [[unlikely]]
         {
             log("[ERROR] DIVU: Division by zero!\n");
             std::abort();

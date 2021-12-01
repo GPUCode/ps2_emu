@@ -139,7 +139,7 @@ namespace iop
         instr = next_instr;
 
         /* Check aligment errors. */
-        if (pc & 0x3)
+        if (pc & 0x3) [[unlikely]]
         {
             cop0.BadA = pc;
             exception(Exception::ReadError);
@@ -482,7 +482,7 @@ namespace iop
         uint32_t vaddr = gpr[base] + offset;
         if (!cop0.sr.IsC)
         {
-            if (vaddr & 0x1)
+            if (vaddr & 0x1) [[unlikely]]
             {
                 cop0.BadA = vaddr;
                 exception(Exception::ReadError);
@@ -518,7 +518,7 @@ namespace iop
         uint32_t vaddr = gpr[base] + offset;
         if (!cop0.sr.IsC) 
         {
-            if (vaddr & 0x1) 
+            if (vaddr & 0x1) [[unlikely]]
             {
                 cop0.BadA = vaddr;
                 exception(Exception::ReadError, 0);
@@ -596,7 +596,7 @@ namespace iop
 
         uint32_t dividend = gpr[rs];
         uint32_t divisor = gpr[rt];
-        if (divisor == 0) 
+        if (divisor == 0) [[unlikely]]
         {
             hi = dividend;
             lo = 0xFFFFFFFF;
@@ -648,12 +648,12 @@ namespace iop
 
         int32_t dividend = (int32_t)gpr[rs];
         int32_t divisor = (int32_t)gpr[rt];
-        if (divisor == 0)
+        if (divisor == 0) [[unlikely]]
         {
             hi = gpr[rs];
             lo = (dividend >= 0 ? 0xFFFFFFFF : 1);
         }
-        else if (gpr[rs] == 0x80000000 && divisor == -1) 
+        else if (gpr[rs] == 0x80000000 && divisor == -1) [[unlikely]]
         {
             hi = 0;
             lo = 0x80000000;
@@ -879,7 +879,7 @@ namespace iop
         uint32_t vaddr = gpr[base] + offset;
         if (!cop0.sr.IsC) 
         {
-            if (vaddr & 0x1) 
+            if (vaddr & 0x1) [[unlikely]]
             {
                 cop0.BadA = vaddr;
                 exception(Exception::WriteError, 0);
@@ -925,7 +925,7 @@ namespace iop
         uint32_t vaddr = gpr[base] + offset;
         if (!cop0.sr.IsC) 
         {
-            if (vaddr & 0x3) 
+            if (vaddr & 0x3) [[unlikely]]
             {
                 cop0.BadA = vaddr;
                 exception(Exception::ReadError, 0);
@@ -1029,7 +1029,7 @@ namespace iop
         uint32_t vaddr = gpr[base] + offset;
         if (!cop0.sr.IsC) 
         {
-            if (vaddr & 0x3) 
+            if (vaddr & 0x3) [[unlikely]]
             {
                 cop0.BadA = vaddr;
                 exception(Exception::WriteError, 0);
