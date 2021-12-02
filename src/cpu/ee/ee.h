@@ -1,6 +1,6 @@
 #pragma once
-#include <common/manager.hpp>
-#include <cpu/ee/cop0.hpp>
+#include <common/manager.h>
+#include <cpu/ee/cop0.h>
 #include <array>
 
 namespace ee

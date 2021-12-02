@@ -1,6 +1,6 @@
-#include <common/manager.hpp>
-#include <cpu/ee/ee.hpp>
-#include <cpu/iop/iop.hpp>
+#include <common/manager.h>
+#include <cpu/ee/ee.h>
+#include <cpu/iop/iop.h>
 
 int cycles_executed = 0;
 

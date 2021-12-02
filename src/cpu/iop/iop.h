@@ -1,6 +1,6 @@
 #pragma once
-#include <cpu/iop/cop0.hpp>
-#include <common/manager.hpp>
+#include <cpu/iop/cop0.h>
+#include <common/manager.h>
 
 namespace iop
 {

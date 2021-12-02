@@ -1,5 +1,5 @@
-#include <cpu/ee/ee.hpp>
-#include <common/manager.hpp>
+#include <cpu/ee/ee.h>
+#include <common/manager.h>
 #include <fmt/color.h>
 
 #ifndef NDEBUG

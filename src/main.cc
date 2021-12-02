@@ -1,6 +1,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <common/manager.hpp>
+#include <common/manager.h>
 #include <thread>
 
 int main()
