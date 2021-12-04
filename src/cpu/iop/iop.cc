@@ -491,10 +491,9 @@ namespace iop
             {
                 uint32_t value = (int16_t)read<uint16_t>(vaddr);
                 load(rt, value);
+                log("LH: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, value, vaddr, base, gpr[base], offset);
             }
         }
-
-        log("LH: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt], vaddr, base, gpr[base], offset);
     }
 
     void IOProcessor::op_sllv()
@@ -527,10 +526,9 @@ namespace iop
             {
                 uint32_t value = read<uint16_t>(vaddr);
                 load(rt, value);
+                log("LHU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, value, vaddr, base, gpr[base], offset);
             }
         }
-
-        log("LHU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt], vaddr, base, gpr[base], offset);
     }
 
     void IOProcessor::op_rfe()
@@ -730,9 +728,8 @@ namespace iop
         {
             uint32_t value = read<uint8_t>(vaddr);
             load(rt, value);
+            log("LBU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, value, vaddr, base, gpr[base], offset);
         }
-
-        log("LBU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt], vaddr, base, gpr[base], offset);
     }
 
     void IOProcessor::op_blez()
@@ -821,10 +818,8 @@ namespace iop
         {
             uint32_t value = (int8_t)read<uint8_t>(vaddr);
             load(rt, value);
+            log("LB: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, value, vaddr, base, gpr[base], offset);
         }
-
-        log("LB: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt], vaddr, base, gpr[base], offset);
-
     }
 
     void IOProcessor::op_jr()
@@ -934,10 +929,9 @@ namespace iop
             {
                 uint32_t value = read<uint32_t>(vaddr);
                 load(rt, value);
+                log("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, value, vaddr, base, gpr[base], offset);
             }
         }
-
-        log("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt], vaddr, base, gpr[base], offset);
     }
 
     void IOProcessor::op_addi()
