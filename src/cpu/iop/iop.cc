@@ -2,7 +2,7 @@
 #include <cstring>
 #include <fmt/color.h>
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 #define log(x) (void)0
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;

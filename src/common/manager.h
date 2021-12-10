@@ -1,5 +1,6 @@
 #pragma once
 #include <common/memory.h>
+#include <cpu/iop/dma.h>
 #include <fmt/core.h>
 #include <memory>
 #include <vector>
@@ -41,6 +42,7 @@ public:
     /* Components */
     std::unique_ptr<ee::EmotionEngine> ee;
     std::unique_ptr<iop::IOProcessor> iop;
+    std::unique_ptr<iop::DMAController> iop_dma;
     
     /* Memory - Registers */
     uint8_t* ram, * iop_ram, * bios;
@@ -67,6 +69,8 @@ T ComponentManager::read(uint32_t addr, Component comp)
         return *(T*)&bios[ee::BIOS.offset(vaddr)];
     else if (iop::RAM.contains(vaddr))
         return *(T*)&iop_ram[iop::RAM.offset(vaddr)];
+    else if (iop::DMA1.contains(vaddr) || iop::DMA2.contains(vaddr))
+        return iop_dma->read(vaddr);
     else /* Otherwise handle specific address diferently. */
     {
         switch (vaddr)
@@ -99,6 +103,9 @@ T ComponentManager::read(uint32_t addr, Component comp)
             }
             return 0;
         }
+        case 0x1f801450: /* Unknown */
+        case 0xfffe0130: /* Cache control */
+            return 0;
         default:
             fmt::print("[{}] {:d}bit read from unknown address {:#x}\n", component_name[comp], sizeof(T) * 8, addr);
             return 0;
@@ -117,6 +124,8 @@ void ComponentManager::write(uint32_t addr, T data, Component comp)
         *(T*)&ram[ee::RAM.offset(vaddr)] = data;
     else if (iop::RAM.contains(vaddr))
         *(T*)&iop_ram[iop::RAM.offset(vaddr)] = data;
+    else if (iop::DMA1.contains(vaddr) || iop::DMA2.contains(vaddr))
+        iop_dma->write(vaddr, data);
     else
     {
         switch (vaddr)
@@ -144,6 +153,9 @@ void ComponentManager::write(uint32_t addr, T data, Component comp)
             MCH_DRD = data;
             break;
         }
+        case 0x1f801450:
+        case 0xfffe0130: /* Cache control */
+            return;
         default:
             fmt::print("[{}] {:d}bit write {:#x} to unknown address {:#x}\n", component_name[comp], sizeof(T) * 8, data, addr);
             break;

@@ -58,5 +58,6 @@ namespace iop
 	constexpr Range KSEG0 = Range(0x80000000, 512 * 1024 * 1024LL);
 	constexpr Range KSEG1 = Range(0xA0000000, 512 * 1024 * 1024LL);
 	constexpr Range KSEG2 = Range(0xC0000000, 1024 * 1024 * 1024LL);
+	constexpr Range DMA1 = Range(0x1f801080, 0x80LL), DMA2 = Range(0x1f801500, 0x80LL);
 	constexpr Range INTERRUPT = Range(0x1f801070, 8);
 };

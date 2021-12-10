@@ -17,11 +17,12 @@ ComponentManager::ComponentManager()
 
     /* Load the BIOS in our memory */
     /* NOTE: Must make a GUI for this someday */
-    this->read_bios();
+    read_bios();
 
     /* Finally construct our components */
     ee = std::make_unique<ee::EmotionEngine>(this);
     iop = std::make_unique<iop::IOProcessor>(this);
+    iop_dma = std::make_unique<iop::DMAController>(this);
 }
 
 ComponentManager::~ComponentManager()

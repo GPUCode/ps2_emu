@@ -1,24 +1,33 @@
 #pragma once
 #include <cstdint>
 
+class ComponentManager;
+
 namespace iop
 {
-	enum class SyncType : uint32_t
+	enum class TransferMode : uint32_t
 	{
-		Manual = 0,
-		Request = 1,
-		Linked_List = 2
+		Burst,
+		Slice,
+		Linked_List,
+		Chain
 	};
 
 	enum DMAChannels : uint32_t
 	{
-		MDECin = 0x0,
-		MDECout = 0x1,
-		GPU = 0x2,
-		CDROM = 0x3,
-		SPU = 0x4,
-		PIO = 0x5,
-		OTC = 0x6
+		MDECin,
+		MDECout,
+		SIF2,
+		CDVD,
+		SPU1,
+		PIO,
+		OTC,
+		SPU2,
+		DEV9,
+		SIF0,
+		SIF1,
+		SIO2in,
+		SIO2out
 	};
 
 	/* General info about DMA for each channel. */
@@ -31,7 +40,7 @@ namespace iop
 			uint32_t addr_step : 1;
 			uint32_t : 6;
 			uint32_t chop_enable : 1;
-			SyncType sync_mode : 2;
+			TransferMode transfer_mode : 2;
 			uint32_t : 5;
 			uint32_t chop_dma : 3;
 			uint32_t : 1;
@@ -50,8 +59,8 @@ namespace iop
 		uint32_t value;
 		struct
 		{
-			uint16_t block_size;
-			uint16_t block_count; /* Only used in Request sync mode. */
+			uint16_t size; /* Block size in words. */
+			uint16_t count; /* Only used in Request sync mode. */
 		};
 	};
 
@@ -59,17 +68,18 @@ namespace iop
 	struct DMAChannel
 	{
 		uint32_t base;
-		DMABlockReg block;
-		DMAControlReg control;
+		DMABlockReg block_ctrl;
+		DMAControlReg channel_ctrl;
+		uint32_t tadr;
 	};
 
-	/* DMA Interrupt Register. */
-	union DMAIRQReg
+	union DICR
 	{
 		uint32_t value;
 		struct
 		{
-			uint32_t : 15;
+			uint32_t completion : 7;
+			uint32_t : 8;
 			uint32_t force : 1;
 			uint32_t enable : 7;
 			uint32_t master_enable : 1;
@@ -78,18 +88,33 @@ namespace iop
 		};
 	};
 
-	union ListPacket
+	union DICR2
 	{
 		uint32_t value;
 		struct
 		{
-			uint32_t next_addr : 24;
-			uint32_t size : 8;
+			uint32_t tag : 13;
+			uint32_t : 3;
+			uint32_t mask : 6;
+			uint32_t : 2;
+			uint32_t flags : 6;
+			uint32_t : 2;
 		};
 	};
 
+	/* The standalone registers */
+	struct DMAGlobals
+	{
+		uint32_t dpcr[2];
+		DICR dicr;
+		DICR2 dicr2;
+		uint32_t pad1; /* Added so we can read the struct nicely using pointer arithmetic */
+		uint32_t dmacen;
+		uint32_t pad2;
+		uint32_t dmacinten;
+	};
+
 	/* A class that manages all DMA routines. */
-	class ComponentManager;
 	class DMAController {
 	public:
 		DMAController(ComponentManager* manager);
@@ -105,11 +130,10 @@ namespace iop
 		void write(uint32_t address, uint32_t data);
 
 	public:
-		uint32_t control;
-		DMAIRQReg irq;
-		DMAChannel channels[7];
+		DMAChannel channels[13] = {};
+		DMAGlobals globals = {};
 
 		bool irq_pending = false;
-		ComponentManager* manager;
+		ComponentManager* manager = nullptr;
 	};
 }
