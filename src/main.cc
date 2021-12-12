@@ -26,7 +26,6 @@ int main()
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
         return -1;
 
-    /* Move ComponentManger to its own thread for maximum performance. */
     ComponentManager manager;
     std::thread thread([&]() { while (!manager.stop_thread) { manager.tick(); } });
 

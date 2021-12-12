@@ -125,7 +125,11 @@ namespace ee
         void op_dsra32(); void op_dsll(); void op_lhu(); void op_bltz();
         void op_sh(); void op_madd(); void op_divu1(); void op_mflo1();
         void op_dsrav(); void op_xori(); void op_mult1(); void op_movz();
-        void op_dsllv(); void op_daddiu(); void op_sq();
+        void op_dsllv(); void op_daddiu(); void op_sq(); void op_lh();
+        void op_cache(); void op_sllv();
+
+        /* Parallel instructions */
+        void op_por();
 
     protected:
         ComponentManager* manager;

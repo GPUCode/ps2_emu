@@ -12,38 +12,40 @@ namespace iop
 	constexpr uint8_t COP0_C0 = 0b10000;
 	constexpr uint8_t COP0_TLB = 0b10000;
 
-	union COP0STAT {
+	union COP0STAT 
+	{
 		uint32_t value;
-		struct {
+		struct 
+		{
 			uint32_t IEc : 1;		/* Interrupt Enable (current) */
 			uint32_t KUc : 1;		/* Kernel-User Mode (current) */
 			uint32_t IEp : 1;		/* Interrupt Enable (previous) */
 			uint32_t KUp : 1;		/* Kernel-User Mode (previous) */
 			uint32_t IEo : 1;		/* Interrupt Enable (old) */
 			uint32_t KUo : 1;		/* Kernel-User Mode (old) */
-			uint32_t reserved1 : 2;
-			uint32_t Sw : 2;		/* Software Interrupt Mask */
-			uint32_t Intr : 6;	/* Hardware Interrupt Mask */
+			uint32_t : 2;
+			uint32_t Im : 8;	/* Hardware Interrupt Mask */
 			uint32_t IsC : 1;		/* Isolate Cache */
-			uint32_t reserved2 : 1;
+			uint32_t : 1;
 			uint32_t PZ : 1;		/* Parity Zero */
-			uint32_t reserved3 : 1;
+			uint32_t CM : 1;
 			uint32_t PE : 1;		/* Parity Error */
 			uint32_t TS : 1;		/* TLB Shutdown */
 			uint32_t BEV : 1;		/* Bootstrap Exception Vectors */
-			uint32_t reserved4 : 5;
+			uint32_t : 5;
 			uint32_t Cu : 4;		/* Coprocessor Usability */
 		};
 	};
 
-	union COP0CAUSE {
+	union COP0CAUSE 
+	{
 		uint32_t value;
-
-		struct {
+		struct 
+		{
 			uint32_t : 2;
-			uint32_t exc_code : 5;	/* Exception Code */
+			uint32_t excode : 5;	/* Exception Code */
 			uint32_t : 1;
-			uint32_t Sw : 2;		/* Software Interrupts */
+			uint32_t : 2; /* Part of IP but these bits are special and we don't modify them */
 			uint32_t IP : 6;		/* Interrupt Pending */
 			uint32_t : 12;
 			uint32_t CE : 2;		/* Coprocessor Error */
@@ -52,10 +54,11 @@ namespace iop
 		};
 	};
 
-	union COP0 {
-		uint32_t regs[64];
-
-		struct {
+	union COP0 
+	{
+		uint32_t regs[32] = {};
+		struct 
+		{
 			uint32_t r0;
 			uint32_t r1;
 			uint32_t r2;
@@ -72,7 +75,6 @@ namespace iop
 			COP0CAUSE cause;	/* Cause */
 			uint32_t epc;		/* Exception Program Counter */
 			uint32_t PRId;		/* Processor Revision Identifier */
-			uint32_t reserved[32];
 		};
 	};
 };

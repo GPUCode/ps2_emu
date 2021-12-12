@@ -100,6 +100,8 @@ namespace ee
         case 0b001110: op_xori(); break;
         case 0b011001: op_daddiu(); break;
         case 0b011111: op_sq(); break;
+        case 0b100001: op_lh(); break;
+        case 0b101111: op_cache(); break;
         default:
             fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
             std::abort();
@@ -229,9 +231,10 @@ namespace ee
         case 0b010111: op_dsrav(); break;
         case 0b001010: op_movz(); break;
         case 0b010100: op_dsllv(); break;
+        case 0b000100: op_sllv(); break;
         default:
             fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
-		    std::exit(1);
+		    std::abort();
         }
     }
 
@@ -752,6 +755,54 @@ namespace ee
         }
     }
 
+    void EmotionEngine::op_lh()
+    {
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        uint32_t vaddr = offset + gpr[base].word[0];
+
+        log("LH: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+        if (vaddr & 0x1) [[unlikely]]
+        {
+            log("[ERROR] LH: Address {:#x} is not aligned\n", vaddr);
+            exception(Exception::AddrErrorLoad);
+        }
+        else
+            gpr[rt].dword[0] = (int16_t)read<uint16_t>(vaddr);
+    }
+
+    void EmotionEngine::op_cache()
+    {
+        log("\n");
+    }
+
+    void EmotionEngine::op_sllv()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        uint32_t reg = gpr[rt].word[0];
+        uint16_t sa = gpr[rs].word[0] & 0x3F;
+        gpr[rd].dword[0] = (int32_t)(reg << sa);
+
+        log("SLLV: GPR[{:d}] = GPR[{:d}] ({:#x}) << GPR[{:d}] ({:d})\n", rd, rt, reg, rs, sa);
+    }
+
+    void EmotionEngine::op_por()
+    {
+        uint16_t rt = instr.r_type.rt;
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+
+        log("POR: GPR[{:d}] = GPR[{:d}] ({:#x}) | GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+
+        gpr[rd].dword[0] = gpr[rs].dword[0] | gpr[rt].dword[0];
+        gpr[rd].dword[1] = gpr[rs].dword[1] | gpr[rt].dword[1];
+    }
+
     void EmotionEngine::op_dsrav()
     {
         uint16_t rs = instr.r_type.rs;
@@ -858,9 +909,18 @@ namespace ee
         case 0b011011: op_divu1(); break;
         case 0b010010: op_mflo1(); break;
         case 0b011000: op_mult1(); break;
+        case 0b101001:
+            switch (instr.r_type.sa)
+            {
+            case 0b10010: op_por(); break;
+            default:
+                fmt::print("[ERROR] Unimplemented MMI3 instruction: {:#05b}\n", (uint16_t)instr.r_type.sa);
+                std::abort();
+            }
+            break;
         default:
-            log("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.funct);
-		    std::exit(1);
+            fmt::print("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.funct);
+		    std::abort();
         }
     }
 

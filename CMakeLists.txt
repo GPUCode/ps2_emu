@@ -15,7 +15,7 @@ add_executable(${PROJECT_NAME}
 	"src/common/manager.cc" 
 	"src/cpu/ee/ee.cc"
 	"src/cpu/iop/iop.cc"
-	"src/cpu/iop/dma.cc")
+	"src/cpu/iop/dma.cc" "src/cpu/iop/timers.h" "src/cpu/iop/timers.cc")
 
 # Link to all the required conan libs
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)

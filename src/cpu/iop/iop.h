@@ -1,34 +1,42 @@
 #pragma once
 #include <cpu/iop/cop0.h>
+#include <cpu/iop/timers.h>
 #include <common/manager.h>
 
 namespace iop
 {
     /* Used for storing load-delay slots */
-    struct LoadInfo {
+    struct LoadInfo 
+    {
         uint32_t reg = 0;
         uint32_t value = 0;
     };
 
     /* Nice interface for instructions */
-    struct Instruction {
-        union {
+    struct Instruction 
+    {
+        union 
+        {
             uint32_t value;
-            struct { /* Used when polling for the opcode */
+            struct /* Used when polling for the opcode */
+            {
                 uint32_t : 26;
                 uint32_t opcode : 6;
             };
-            struct {
+            struct 
+            {
                 uint32_t immediate : 16;
                 uint32_t rt : 5;
                 uint32_t rs : 5;
                 uint32_t opcode : 6;
             } i_type;
-            struct {
+            struct 
+            {
                 uint32_t target : 26;
                 uint32_t opcode : 6;
             } j_type;
-            struct {
+            struct 
+            {
                 uint32_t funct : 6;
                 uint32_t sa : 5;
                 uint32_t rd : 5;
@@ -66,8 +74,30 @@ namespace iop
         Overflow = 0xC
     };
 
+    enum class Interrupt
+    {
+        VBLANKBegin = 0,
+        GPU = 1,
+        CDVD = 2,
+        DMA = 3,
+        Timer0 = 4,
+        Timer1 = 5,
+        Timer2 = 6,
+        SIO0 = 7,
+        SIO1 = 8,
+        SPU2 = 9,
+        PIO = 10,
+        VBLANKEnd = 11,
+        PCMCIA = 13,
+        Timer3 = 14,
+        Timer4 = 15,
+        Timer5 = 16,
+        SIO2 = 17,
+    };
+
     /* A class implemeting the PS2 IOP, a MIPS R3000A CPU. */
-    class IOProcessor {
+    class IOProcessor 
+    {
     public:
         IOProcessor(ComponentManager* manager);
         ~IOProcessor();
@@ -78,6 +108,8 @@ namespace iop
         void fetch();
         void branch();
         void handle_load_delay();
+        void trigger(Interrupt intr);
+        void handle_interrupts();
 
         /* Call this after setting the PC to skip delay slot */
         void direct_jump();
@@ -134,10 +166,18 @@ namespace iop
         ComponentManager* manager;
 
         uint32_t pc;
-        uint32_t i_stat, i_mask;
         uint32_t gpr[32];
         uint32_t hi, lo;
         uint32_t exception_addr[2] = { 0x80000080, 0xBFC00180 };
+
+        /* IOP interrupts */
+        struct
+        {
+            uint32_t i_stat;
+            uint32_t i_mask;
+            uint32_t i_ctrl;
+        } intr = {};
+        Timers timers;
 
         /* Coprocessors. */
         COP0 cop0;
@@ -150,14 +190,37 @@ namespace iop
     };
 
     template<typename T>
-    inline T IOProcessor::read(uint32_t addr)
+    inline T IOProcessor::read(uint32_t address)
     {
-        return manager->read<T>(addr, Component::IOP);
+        if (INTERRUPT.contains(address & 0x1fffffff))
+        {
+            uint32_t offset = (address & 0xf) >> 2;
+            return *((uint32_t*)&intr + offset);
+        }
+        else
+        {
+            return manager->read<T>(address, Component::IOP);
+        }
     }
 
     template<typename T>
-    inline void IOProcessor::write(uint32_t addr, T data)
+    inline void IOProcessor::write(uint32_t address, T data)
     {
-        manager->write<T>(addr, data, Component::IOP);
+        if (INTERRUPT.contains(address & 0x1fffffff))
+        {
+            uint32_t offset = (address & 0xf) >> 2;
+            auto ptr = (uint32_t*)&intr + offset;
+
+            /* Writing to I_STAT (offset == 0) is special */
+            *ptr = (offset == 0 ? *ptr & data : data);
+        }
+        else if (TIMERS1.contains(address & 0x1fffffff) || TIMERS2.contains(address & 0x1fffffff))
+        {
+            timers.write(address, data);
+        }
+        else
+        {
+            manager->write<T>(address, data, Component::IOP);
+        }
     }
 };
