@@ -338,7 +338,7 @@ namespace ee
         uint16_t base = instr.i_type.rs;
         int16_t imm = (int16_t)instr.i_type.immediate;
 
-        uint32_t vaddr = (gpr[base].word[0] + imm) & 0b0000;
+        uint32_t vaddr = gpr[base].word[0] + imm;
         gpr[rt].dword[0] = read<uint64_t>(vaddr);
         gpr[rt].dword[1] = read<uint64_t>(vaddr + 8);
 
