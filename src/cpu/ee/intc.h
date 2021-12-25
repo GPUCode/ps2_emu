@@ -45,7 +45,5 @@ namespace ee
 	private:
 		EmotionEngine* cpu;
 		INTCRegs regs;
-
-		bool should_interrupt = false;
 	};
 }

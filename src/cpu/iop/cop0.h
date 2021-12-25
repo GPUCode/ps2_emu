@@ -45,8 +45,7 @@ namespace iop
 			uint32_t : 2;
 			uint32_t excode : 5;	/* Exception Code */
 			uint32_t : 1;
-			uint32_t : 2; /* Part of IP but these bits are special and we don't modify them */
-			uint32_t IP : 6;		/* Interrupt Pending */
+			uint32_t IP : 8;		/* Interrupt Pending */
 			uint32_t : 12;
 			uint32_t CE : 2;		/* Coprocessor Error */
 			uint32_t BT : 1;		/* Branch Taken */

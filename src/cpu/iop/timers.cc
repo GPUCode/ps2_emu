@@ -12,12 +12,18 @@ namespace iop
 	void Timers::tick(uint32_t cycles)
 	{
 		timers[5].count += cycles;
-		if (timers[5].count >= timers[5].target)
+		if (timers[5].count == timers[5].target)
 		{
 			timers[5].mode.compare_intr_raised = true;
 			if (timers[5].mode.compare_intr)
 			{
-				iop->trigger(Interrupt::Timer5);
+				__debugbreak();
+				iop->intr.trigger(Interrupt::Timer5);
+			}
+
+			if (timers[5].mode.reset_on_intr)
+			{
+				timers[5].count = 0;
 			}
 		}
 
@@ -26,7 +32,7 @@ namespace iop
 			timers[5].mode.overflow_intr_raised = true;
 			if (timers[5].mode.overflow_intr)
 			{
-				iop->trigger(Interrupt::Timer5);
+				iop->intr.trigger(Interrupt::Timer5);
 			}
 		}
 	}
@@ -44,6 +50,8 @@ namespace iop
 			mode.compare_intr_raised = false;
 			mode.overflow_intr_raised = false;
 		}
+
+		fmt::print("[IOP TIMERS] Reading {:#x} from timer {:d} at offset {:#x}\n", *ptr, timer + 3 * group, offset << 2);
 
 		return *ptr;
 	}

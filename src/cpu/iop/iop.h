@@ -1,6 +1,7 @@
 #pragma once
 #include <cpu/iop/cop0.h>
 #include <cpu/iop/timers.h>
+#include <cpu/iop/intr.h>
 #include <common/emulator.h>
 
 namespace iop
@@ -74,27 +75,6 @@ namespace iop
         Overflow = 0xC
     };
 
-    enum class Interrupt
-    {
-        VBLANKBegin = 0,
-        GPU = 1,
-        CDVD = 2,
-        DMA = 3,
-        Timer0 = 4,
-        Timer1 = 5,
-        Timer2 = 6,
-        SIO0 = 7,
-        SIO1 = 8,
-        SPU2 = 9,
-        PIO = 10,
-        VBLANKEnd = 11,
-        PCMCIA = 13,
-        Timer3 = 14,
-        Timer4 = 15,
-        Timer5 = 16,
-        SIO2 = 17,
-    };
-
     /* A class implemeting the PS2 IOP, a MIPS R3000A CPU. */
     class IOProcessor 
     {
@@ -108,8 +88,6 @@ namespace iop
         void fetch();
         void branch();
         void handle_load_delay();
-        void trigger(Interrupt intr);
-        void handle_interrupts();
 
         /* Call this after setting the PC to skip delay slot */
         void direct_jump();
@@ -171,12 +149,7 @@ namespace iop
         uint32_t exception_addr[2] = { 0x80000080, 0xBFC00180 };
 
         /* IOP interrupts */
-        struct
-        {
-            uint32_t i_stat;
-            uint32_t i_mask;
-            uint32_t i_ctrl;
-        } intr = {};
+        INTR intr;
         Timers timers;
 
         /* Coprocessors. */
@@ -200,11 +173,11 @@ namespace iop
         {
         case 0 ... 0x1fffff:
             return *(T*)&ram[paddr];
+        case 0x1f801100 ... 0x1f80112c:
+        case 0x1f801480 ... 0x1f8014ac:
+            return timers.read(paddr);
         case 0x1f801070 ... 0x1f801078:
-        {
-            uint32_t offset = (paddr & 0xf) >> 2; /* Will probably abstract this */
-            return *((uint32_t*)&intr + offset);
-        }
+            return intr.read(paddr);
         case 0x1f801450:
         case 0x1f801578:
         case 0xfffe0130: /* Cache control */
@@ -226,14 +199,7 @@ namespace iop
             break;
         }
         case 0x1f801070 ... 0x1f801078:
-        {
-            uint32_t offset = (paddr & 0xf) >> 2;
-            auto ptr = (uint32_t*)&intr + offset;
-
-            /* Writing to I_STAT (offset == 0) is special */
-            *ptr = (offset == 0 ? *ptr & data : data);
-            break;
-        }
+            return intr.write(paddr, data);
         case 0x1f801100 ... 0x1f80112c:
         case 0x1f801480 ... 0x1f8014ac:
             return timers.write(paddr, data);

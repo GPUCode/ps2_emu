@@ -2,7 +2,7 @@
 #include <cstring>
 #include <fmt/color.h>
 
-#ifdef NDEBUG
+#ifndef NDEBUG
 #define log(...) ((void)0)
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
@@ -12,7 +12,7 @@ constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasi
 namespace iop
 {
     IOProcessor::IOProcessor(common::Emulator* parent) :
-        emulator(parent), timers(this)
+        emulator(parent), timers(this), intr(this)
     {
         /* Set PRID Processor ID*/
         cop0.PRId = 0x1f;
@@ -86,9 +86,12 @@ namespace iop
         default: exception(Exception::IllegalInstr);
         }
 
-        /* Apply pending load delays and handle any pending interrupts. */
+        /* Apply pending load delays. */
         handle_load_delay();
-        handle_interrupts();
+        
+        /* Execute pending interrupts */
+        if (intr.interrupt_pending())
+            exception(Exception::Interrupt);
 
         /* Increment timers */
         timers.tick(1);
@@ -214,19 +217,6 @@ namespace iop
         direct_jump();
     }
 
-    void IOProcessor::handle_interrupts()
-    {
-        /* If !I_CTRL && (I_STAT & I_MASK), then COP0.Cause:8 is set */
-        bool pending = !intr.i_ctrl && (intr.i_stat & intr.i_mask);
-        cop0.cause.IP = (cop0.cause.IP & ~0x1) | pending;
-
-        /* If pending and enabled, handle the interrupt. */
-        if (cop0.sr.IEc && (cop0.sr.Im & cop0.cause.IP))
-        {
-            exception(Exception::Interrupt);
-        }
-    }
-
     void IOProcessor::handle_load_delay()
     {
         if (delayed_memory_load.reg != memory_load.reg) 
@@ -240,12 +230,6 @@ namespace iop
         gpr[write_back.reg] = write_back.value;
         write_back.reg = 0;
         gpr[0] = 0;
-    }
-
-    void IOProcessor::trigger(Interrupt interrupt)
-    {
-        /* Set the appropriate interrupt bit */
-        intr.i_stat |= (1 << (uint32_t)interrupt);
     }
 
     void IOProcessor::op_bcond()

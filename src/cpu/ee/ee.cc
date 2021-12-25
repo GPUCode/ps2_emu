@@ -111,7 +111,15 @@ namespace ee
             std::abort();
         }
 
+        /* Increment COP0 counter */
         cop0.count++;
+
+        /* Check for interrupts */
+        if (intc.int_pending())
+        {
+            fmt::print("[EE] Interrupt!\n");
+            exception(Exception::Interrupt);
+        }
     }
 
     void EmotionEngine::exception(Exception exception)

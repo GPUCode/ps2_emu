@@ -17,7 +17,9 @@ add_executable(${PROJECT_NAME}
 	"src/cpu/iop/iop.cc"
 	"src/cpu/iop/dma.cc" 
 	"src/cpu/iop/timers.cc" 
-	"src/cpu/ee/intc.cc")
+	"src/cpu/ee/intc.cc"
+	"src/cpu/iop/intr.cc"
+)
 
 # Link to all the required conan libs
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
