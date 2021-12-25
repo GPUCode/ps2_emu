@@ -1,29 +1,35 @@
 #pragma once
-#include <common/manager.h>
+#include <common/emulator.h>
 #include <cpu/ee/cop0.h>
-#include <array>
+#include <cpu/ee/intc.h>
 
 namespace ee
 {
     /* Nice interface for instructions */
-    struct Instruction {
-        union {
+    struct Instruction
+    {
+        union
+        {
             uint32_t value;
-            struct { /* Used when polling for the opcode */
+            struct
+            { /* Used when polling for the opcode */
                 uint32_t : 26;
                 uint32_t opcode : 6;
             };
-            struct {
+            struct
+            {
                 uint32_t immediate : 16;
                 uint32_t rt : 5;
                 uint32_t rs : 5;
                 uint32_t opcode : 6;
             } i_type;
-            struct {
+            struct
+            {
                 uint32_t target : 26;
                 uint32_t opcode : 6;
             } j_type;
-            struct {
+            struct
+            {
                 uint32_t funct : 6;
                 uint32_t sa : 5;
                 uint32_t rd : 5;
@@ -46,25 +52,15 @@ namespace ee
         }
     };
 
-    union Register {
+    union Register
+    {
         uint64_t dword[2] = {};
         uint32_t word[4];
     };
 
     constexpr uint8_t SPECIAL_OPCODE = 0b000000;
-    constexpr const char* const REG[] =
-    {
-        "zero", "at", "v0", "v1",
-        "a0", "a1", "a2", "a3",
-        "t0", "t1", "t2", "t3",
-        "t4", "t5", "t6", "t7",
-        "s0", "s1", "s2", "s3",
-        "s4", "s5", "s6", "s7",
-        "t8", "t9", "k0", "k1",
-        "gp", "sp", "fp", "ra"
-    };
 
-    enum class ExceptionVector
+    enum ExceptionVector
     {
         V_TLB_REFILL = 0x0,
         V_COMMON = 0x180,
@@ -88,9 +84,11 @@ namespace ee
     };
 
     /* A class implemeting the MIPS R5900 CPU. */
-    class EmotionEngine {
+    class EmotionEngine
+    {
+        friend class INTC;
     public:
-        EmotionEngine(ComponentManager* parent);
+        EmotionEngine(common::Emulator* parent);
         ~EmotionEngine();
 
         /* CPU functionality. */
@@ -132,7 +130,7 @@ namespace ee
         void op_por();
 
     protected:
-        ComponentManager* manager;
+        common::Emulator* emulator;
 
         /* Registers. */
         Register gpr[32];
@@ -140,37 +138,116 @@ namespace ee
         uint64_t hi0, hi1, lo0, lo1;
         uint32_t sa;
         Instruction instr, next_instr;
+        uint32_t exception_addr[2] = { 0x80000000, 0xBFC00200 };
+        bool skip_branch_delay = false;
 
         /* FPU (COP1) registers */
         Register fpr[32];
         uint64_t fcr0, fcr31;
 
-        bool skip_branch_delay = false;
-
-        /* Scratchpad */
+        /* EE memory */
         uint8_t scratchpad[16 * 1024];
+        uint8_t* ram = nullptr;
+
+        /* MCH registers (Idk what these are) */
+        uint32_t MCH_RICM = 0, MCH_DRD = 0;
+        uint8_t rdram_sdevid = 0;
 
         /* Coprocessors */
-        COP0 cop0;
+        COP0 cop0 = {};
 
+        /* Interrupts/Timers */
+        INTC intc;
+
+        /* Logging */
         std::FILE* disassembly;
+        std::ofstream console;
     };
 
     template <typename T>
     T EmotionEngine::read(uint32_t addr)
     {
-        if (addr >= 0x70000000 && addr < 0x70004000) /* Read from scratchpad */
-            return *(T*)&scratchpad[addr & 0x3FFF];
-        else
-            return manager->read<T>(addr, Component::EE);
+        uint32_t paddr = addr & common::KUSEG_MASKS[addr >> 29];
+        switch (paddr)
+        {
+        case 0 ... 0x1ffffff:
+            return *(T*)&ram[paddr];
+        case 0x1000f000:
+        case 0x1000f010:
+            return intc.read(paddr);
+        case 0x1000f130: /* Idk what's this */
+        case 0x1000f430: /* Read from MCH_DRD */
+            return 0;
+        case 0x1000f440: /* Read from MCH_RICM */
+        {
+            uint8_t SOP = (MCH_RICM >> 6) & 0xF;
+            uint8_t SA = (MCH_RICM >> 16) & 0xFFF;
+            if (!SOP)
+            {
+                switch (SA)
+                {
+                case 0x21:
+                    if (rdram_sdevid < 2)
+                    {
+                        rdram_sdevid++;
+                        return 0x1F;
+                    }
+                    return 0;
+                case 0x23:
+                    return 0x0D0D;
+                case 0x24:
+                    return 0x0090;
+                case 0x40:
+                    return MCH_RICM & 0x1F;
+                }
+            }
+            return 0;
+        }
+        case 0x70000000 ... 0x70003fff:
+            return *(T*)&scratchpad[paddr & 0x3FFF];
+        default:
+            return emulator->read<T, common::ComponentID::EE>(paddr);
+        }
     }
 
     template <typename T>
     void EmotionEngine::write(uint32_t addr, T data)
     {
-        if (addr >= 0x70000000 && addr < 0x70004000)
-            *(T*)&scratchpad[addr & 0x3FFF] = data;
-        else
-            manager->write<T>(addr, data, Component::EE);
+        uint32_t paddr = addr & common::KUSEG_MASKS[addr >> 29];
+        switch (paddr)
+        {
+        case 0 ... 0x1ffffff:
+            *(T*)&ram[paddr] = data;
+            break;
+        case 0x1000f000:
+        case 0x1000f010:
+            intc.write(paddr, data);
+            break;
+        case 0x1000f180: /* Record any console output */
+        {
+            console << (char)data;
+            console.flush();
+            break;
+        }
+        case 0x1000f430:
+        {
+            uint8_t SA = (data >> 16) & 0xFFF;
+            uint8_t SBC = (data >> 6) & 0xF;
+
+            if (SA == 0x21 && SBC == 0x1 && ((MCH_DRD >> 7) & 1) == 0)
+                rdram_sdevid = 0;
+
+            MCH_RICM = data & ~0x80000000;
+            break;
+        }
+        case 0x1000f440:
+            MCH_DRD = data;
+            break;
+        case 0x70000000 ... 0x70003fff:
+            *(T*)&scratchpad[paddr & 0x3FFF] = data;
+            break;
+        default:
+            emulator->write<T, common::ComponentID::EE>(paddr, data);
+        }
     }
 };

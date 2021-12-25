@@ -1,9 +1,9 @@
 #include <cpu/ee/ee.h>
-#include <common/manager.h>
+#include <common/emulator.h>
 #include <fmt/color.h>
 
 #ifndef NDEBUG
-#define log(x) (void)0
+#define log(...) (void)0
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
 #define log(...) fmt::print(disassembly, __VA_ARGS__)
@@ -11,12 +11,15 @@ constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasi
 
 namespace ee
 {
-    EmotionEngine::EmotionEngine(ComponentManager* parent)
+    EmotionEngine::EmotionEngine(common::Emulator* parent) :
+        emulator(parent), intc(this)
     {
-        manager = parent;
-
         /* Open output log */
         disassembly = std::fopen("disassembly_ee.log", "w");
+        console.open("console.txt", std::ios::out);
+
+        /* Allocate the 32MB of EE memory */
+        ram = new uint8_t[32 * 1024 * 1024]{};
 
         /* Reset CPU state. */
         reset();
@@ -24,6 +27,7 @@ namespace ee
 
     EmotionEngine::~EmotionEngine()
     {
+        delete[] ram;
         std::fclose(disassembly);
     }
 
@@ -118,9 +122,8 @@ namespace ee
         cop0.cause.exccode = (uint32_t)exception;
         if (!cop0.status.exl)
         {
-            bool in_delay_slot = instr.is_delay_slot;
-            cop0.epc = instr.pc - 4 * in_delay_slot;
-            cop0.cause.bd = in_delay_slot;
+            cop0.epc = instr.pc - 4 * instr.is_delay_slot;
+            cop0.cause.bd = instr.is_delay_slot;
 
             /* Select appropriate exception vector */
             switch (exception)
@@ -142,8 +145,8 @@ namespace ee
         }
 
         /* We do this to avoid branches */
-        pc = 0x80000000 + cop0.status.bev * 0x3FC00200 + (uint32_t)vector;
-    
+        pc = exception_addr[cop0.status.bev] + vector;
+        
         /* Insert the instruction in our pipeline */
         direct_jump();
     }
@@ -638,7 +641,7 @@ namespace ee
         hi0 = (int64_t)(int32_t)(result >> 32);
         gpr[rd].dword[0] = (int64_t)lo0;
 
-        log("MADD: GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", lo0, hi0);
+        //log("MADD: GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", lo0, hi0);
     }
 
     void EmotionEngine::op_divu1()
@@ -938,7 +941,7 @@ namespace ee
         hi1 = (int64_t)(int32_t)(result >> 32);
         gpr[rd].dword[0] = (int64_t)lo1;
 
-        log("MADD1: GPR[{:d}] = LO1 = {:#x} and HI1 = {:#x}\n", lo1, hi1);
+        //log("MADD1: GPR[{:d}] = LO1 = {:#x} and HI1 = {:#x}\n", lo1, hi1);
     }
 
     void EmotionEngine::op_jalr()

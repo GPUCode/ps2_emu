@@ -34,7 +34,8 @@ namespace iop
 	};
 
 	class IOProcessor;
-	class Timers {
+	class Timers 
+	{
 	public:
 		Timers(IOProcessor* iop);
 		~Timers() = default;

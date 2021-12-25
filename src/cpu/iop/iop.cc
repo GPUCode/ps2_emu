@@ -3,7 +3,7 @@
 #include <fmt/color.h>
 
 #ifdef NDEBUG
-#define log(x) (void)0
+#define log(...) ((void)0)
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
 #define log(...) fmt::print(disassembly, __VA_ARGS__)
@@ -11,8 +11,8 @@ constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasi
 
 namespace iop
 {
-    IOProcessor::IOProcessor(ComponentManager* manager) :
-        manager(manager), timers(this)
+    IOProcessor::IOProcessor(common::Emulator* parent) :
+        emulator(parent), timers(this)
     {
         /* Set PRID Processor ID*/
         cop0.PRId = 0x1f;
@@ -20,12 +20,16 @@ namespace iop
         /* Open output log */
         disassembly = std::fopen("disassembly_iop.log", "w");
 
+        /* Allocate the 3MB of IOP memory */
+        ram = new uint8_t[2 * 1024 * 1024]{};
+
         /* Reset CPU state. */
         reset();
     }
 
     IOProcessor::~IOProcessor()
     {
+        delete[] ram;
         std::fclose(disassembly);
     }
 

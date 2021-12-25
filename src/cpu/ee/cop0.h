@@ -13,18 +13,21 @@ namespace ee
     constexpr uint8_t COP0_TLB = 0b10000;
 
     /* The status register fields */
-    union COP0Status {
-        uint32_t value;
-        struct {
+    union COP0Status
+    {
+        uint32_t value = 0x400004; /* BEV, ERL = 1 by default */
+        struct
+        {
             uint32_t ie : 1; /* Interrupt Enable */
             uint32_t exl : 1; /* Exception Level */
             uint32_t erl : 1; /* Error Level */
             uint32_t ksu : 2; /* Kernel/Supervisor/User Mode bits */
             uint32_t : 5;
-            uint32_t im : 2; /* Int[1:0] signals */
+            uint32_t im0 : 1; /* Int[1:0] signals */
+            uint32_t im1 : 1;
             uint32_t bem : 1; /* Bus Error Mask */
             uint32_t : 2;
-            uint32_t im1 : 1; /* Internal timer interrupt  */
+            uint32_t im7 : 1; /* Internal timer interrupt  */
             uint32_t eie : 1; /* Enable IE */
             uint32_t edi : 1; /* EI/DI instruction Enable */
             uint32_t ch : 1; /* Cache Hit */
@@ -38,16 +41,19 @@ namespace ee
         };
     };
 
-    union COP0Cause {
-        uint32_t value;
-        struct {
+    union COP0Cause
+    {
+        uint32_t value = 0;
+        struct
+        {
             uint32_t : 2;
             uint32_t exccode : 5;
             uint32_t : 3;
-            uint32_t ip23 : 2;
+            uint32_t ip1_pending : 1;
+            uint32_t ip0_pending : 1;
             uint32_t siop : 1;
             uint32_t : 2;
-            uint32_t ip7 : 1;
+            uint32_t timer_ip_pending : 1;
             uint32_t exc2 : 3;
             uint32_t : 9;
             uint32_t ce : 2;
@@ -56,16 +62,19 @@ namespace ee
         };
     };
 
-    enum OperatingMode {
+    enum OperatingMode 
+    {
         USER_MODE = 0b10,
         SUPERVISOR_MODE = 0b01,
         KERNEL_MODE = 0b00
     };
 
     /* The COP0 registers */
-    union COP0 {
-        uint32_t regs[32] = { 0 };
-        struct {
+    union COP0
+    {
+        uint32_t regs[32] = {};
+        struct
+        {
             uint32_t index;
             uint32_t random;
             uint32_t entry_lo0;

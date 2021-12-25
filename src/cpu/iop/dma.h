@@ -1,7 +1,11 @@
 #pragma once
+#include <common/component.h>
 #include <cstdint>
 
-class ComponentManager;
+namespace common
+{
+	class Emulator;
+}
 
 namespace iop
 {
@@ -115,9 +119,10 @@ namespace iop
 	};
 
 	/* A class that manages all DMA routines. */
-	class DMAController {
+	class DMAController : public common::Component
+	{
 	public:
-		DMAController(ComponentManager* manager);
+		DMAController(common::Emulator* emu);
 
 		void tick();
 		void transfer_finished(DMAChannels channel);
@@ -126,14 +131,14 @@ namespace iop
 		void block_copy(DMAChannels channel);
 		void list_copy(DMAChannels channel);
 
-		uint32_t read(uint32_t address);
-		void write(uint32_t address, uint32_t data);
+		uint64_t read(uint32_t address);
+		void write(uint32_t address, uint64_t data);
 
 	public:
 		DMAChannel channels[13] = {};
 		DMAGlobals globals = {};
 
 		bool irq_pending = false;
-		ComponentManager* manager = nullptr;
+		common::Emulator* emulator = nullptr;
 	};
 }

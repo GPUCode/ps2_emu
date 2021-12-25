@@ -1,7 +1,7 @@
 #pragma once
 #include <cpu/iop/cop0.h>
 #include <cpu/iop/timers.h>
-#include <common/manager.h>
+#include <common/emulator.h>
 
 namespace iop
 {
@@ -99,7 +99,7 @@ namespace iop
     class IOProcessor 
     {
     public:
-        IOProcessor(ComponentManager* manager);
+        IOProcessor(common::Emulator* parent);
         ~IOProcessor();
 
         /* CPU functionality */
@@ -163,7 +163,7 @@ namespace iop
         void op_mfc0(); void op_mtc0();
 
     public:
-        ComponentManager* manager;
+        common::Emulator* emulator;
 
         uint32_t pc;
         uint32_t gpr[32];
@@ -182,6 +182,9 @@ namespace iop
         /* Coprocessors. */
         COP0 cop0;
 
+        /* IOP memory */
+        uint8_t* ram = nullptr;
+
         /* Pipeline stuff. */
         LoadInfo write_back, memory_load, delayed_memory_load;
         Instruction instr, next_instr;
@@ -190,37 +193,54 @@ namespace iop
     };
 
     template<typename T>
-    inline T IOProcessor::read(uint32_t address)
+    inline T IOProcessor::read(uint32_t addr)
     {
-        if (INTERRUPT.contains(address & 0x1fffffff))
+        uint32_t paddr = addr & common::KUSEG_MASKS[addr >> 29];
+        switch (paddr)
         {
-            uint32_t offset = (address & 0xf) >> 2;
+        case 0 ... 0x1fffff:
+            return *(T*)&ram[paddr];
+        case 0x1f801070 ... 0x1f801078:
+        {
+            uint32_t offset = (paddr & 0xf) >> 2; /* Will probably abstract this */
             return *((uint32_t*)&intr + offset);
         }
-        else
-        {
-            return manager->read<T>(address, Component::IOP);
+        case 0x1f801450:
+        case 0x1f801578:
+        case 0xfffe0130: /* Cache control */
+            return 0;
+        default:
+            return emulator->read<T, common::ComponentID::IOP>(paddr);
         }
     }
 
     template<typename T>
-    inline void IOProcessor::write(uint32_t address, T data)
+    inline void IOProcessor::write(uint32_t addr, T data)
     {
-        if (INTERRUPT.contains(address & 0x1fffffff))
+        uint32_t paddr = addr & common::KUSEG_MASKS[addr >> 29];
+        switch (paddr)
         {
-            uint32_t offset = (address & 0xf) >> 2;
+        case 0 ... 0x1fffff:
+        {
+            *(T*)&ram[paddr] = data;
+            break;
+        }
+        case 0x1f801070 ... 0x1f801078:
+        {
+            uint32_t offset = (paddr & 0xf) >> 2;
             auto ptr = (uint32_t*)&intr + offset;
 
             /* Writing to I_STAT (offset == 0) is special */
             *ptr = (offset == 0 ? *ptr & data : data);
+            break;
         }
-        else if (TIMERS1.contains(address & 0x1fffffff) || TIMERS2.contains(address & 0x1fffffff))
-        {
-            timers.write(address, data);
-        }
-        else
-        {
-            manager->write<T>(address, data, Component::IOP);
+        case 0x1f801100 ... 0x1f80112c:
+        case 0x1f801480 ... 0x1f8014ac:
+            return timers.write(paddr, data);
+        case 0x1f801578: /* This just causes too much logspam */
+            return;
+        default:
+            emulator->write<T, common::ComponentID::IOP>(paddr, data);
         }
     }
 };

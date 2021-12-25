@@ -1,6 +1,6 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <common/manager.h>
+#include <common/emulator.h>
 #include <thread>
 
 int main()
@@ -26,8 +26,8 @@ int main()
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
         return -1;
 
-    ComponentManager manager;
-    std::thread thread([&]() { while (!manager.stop_thread) { manager.tick(); } });
+    common::Emulator emulator;
+    std::thread thread([&]() { while (!emulator.stop_thread) { emulator.tick(); } });
 
     while (!glfwWindowShouldClose(window))
     {
@@ -41,7 +41,7 @@ int main()
         glfwPollEvents();
     }
 
-    manager.stop_thread = true;
+    emulator.stop_thread = true;
     thread.join();
 
     glfwTerminate();

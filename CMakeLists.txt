@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 # Set the project name
 set(PROJECT_NAME gcnemu)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10000000")
 
 project(${PROJECT_NAME})
 
@@ -11,12 +11,15 @@ conan_basic_setup()
 
 # Create executable target
 add_executable(${PROJECT_NAME}	
-	"src/main.cc" 
-	"src/common/manager.cc" 
+	"src/main.cc"
+	"src/common/emulator.cc"
 	"src/cpu/ee/ee.cc"
 	"src/cpu/iop/iop.cc"
-	"src/cpu/iop/dma.cc" "src/cpu/iop/timers.h" "src/cpu/iop/timers.cc")
+	"src/cpu/iop/dma.cc" 
+	"src/cpu/iop/timers.cc" 
+	"src/cpu/ee/intc.cc")
 
 # Link to all the required conan libs
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(${PROJECT_NAME} ${CONAN_LIBS})
