@@ -1,9 +1,10 @@
 #pragma once
 #include <common/component.h>
 #include <cpu/iop/dma.h>
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <memory>
 #include <fstream>
+#include <type_traits>
 
 namespace ee 
 {
@@ -120,6 +121,12 @@ namespace common
         if (handler)
         {
             return (*handler)(paddr, data);
+        }
+        
+        if constexpr (std::is_same<T, unsigned __int128>::value)
+        {
+            uint64_t upper = (data >> 64);
+            fmt::print("[{}] {:d}bit write {:#x}{:016x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, upper, (uint64_t)data, paddr);
         }
         else
         {

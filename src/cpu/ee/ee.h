@@ -52,9 +52,12 @@ namespace ee
         }
     };
 
+    using uint128_t = unsigned __int128;
+
     union Register
     {
-        uint64_t dword[2] = {};
+        uint128_t qword;
+        uint64_t dword[2];
         uint32_t word[4];
     };
 
@@ -133,7 +136,7 @@ namespace ee
         common::Emulator* emulator;
 
         /* Registers. */
-        Register gpr[32];
+        Register gpr[32] = {};
         uint32_t pc;
         uint64_t hi0, hi1, lo0, lo1;
         uint32_t sa;

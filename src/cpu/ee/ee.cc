@@ -350,8 +350,7 @@ namespace ee
         int16_t imm = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = gpr[base].word[0] + imm;
-        gpr[rt].dword[0] = read<uint64_t>(vaddr);
-        gpr[rt].dword[1] = read<uint64_t>(vaddr + 8);
+        gpr[rt].qword = read<uint128_t>(vaddr);
 
         log("LQ: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x} + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], imm);
     }
@@ -761,8 +760,7 @@ namespace ee
         }
         else
         {
-            write<uint64_t>(vaddr, data1);
-            write<uint64_t>(vaddr + 8, data2);
+            write<uint128_t>(vaddr, gpr[rt].qword);
         }
     }
 
