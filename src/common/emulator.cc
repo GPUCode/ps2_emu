@@ -24,6 +24,14 @@ namespace common
 
     Emulator::~Emulator()
     {
+        /* Clean up handler table */
+        for (auto ptr : handlers)
+        {
+            if (ptr != nullptr)
+                delete ptr;
+        }
+        
+        /* Cleanup BIOS memory */
         delete[] bios;
     }
 
