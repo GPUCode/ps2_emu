@@ -48,8 +48,8 @@ namespace gs
 	{
 		GIF(common::Emulator* parent);
 		
-		uint64_t read(uint32_t addr);
-		void write(uint32_t addr, uint64_t data);
+		uint32_t read(uint32_t addr);
+		void write(uint32_t addr, uint32_t data);
 
 	private:
 		common::Emulator* emulator;

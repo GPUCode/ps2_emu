@@ -131,8 +131,8 @@ namespace iop
 		void block_copy(DMAChannels channel);
 		void list_copy(DMAChannels channel);
 
-		uint64_t read(uint32_t address);
-		void write(uint32_t address, uint64_t data);
+		uint32_t read(uint32_t address);
+		void write(uint32_t address, uint32_t data);
 
 	public:
 		DMAChannel channels[13] = {};

@@ -14,18 +14,24 @@ namespace common
 	constexpr uint32_t HANDLER_PAGE_SIZE = 0x80;
 
 	/* Any class that inherits from Component can use these */
-	using Reader = uint64_t(Component::*)(uint32_t);
-	using Writer = void(Component::*)(uint32_t, uint64_t);
+	template <typename T>
+	using Reader = T(Component::*)(uint32_t);
 
-	struct Handler
+	template <typename T>
+	using Writer = void(Component::*)(uint32_t, T);
+
+	struct HandlerBase {};
+
+	template <typename T>
+	struct Handler : public HandlerBase
 	{
 		Handler() = default;
-		Handler(Component* comp, Reader r, Writer w) :
+		Handler(Component* comp, Reader<T> r, Writer<T> w) :
 			c(comp), reader(r), writer(w) {}
 
 		Component* c = nullptr;
-		Reader reader = nullptr;
-		Writer writer = nullptr;
+		Reader<T> reader = nullptr;
+		Writer<T> writer = nullptr;
 
 		inline void operator()(uint32_t addr, uint64_t data) { (c->*writer)(addr, data); }
 		inline uint64_t operator()(uint32_t addr) { return (c->*reader)(addr); }

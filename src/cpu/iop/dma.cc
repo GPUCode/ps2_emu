@@ -50,7 +50,7 @@ namespace iop
 	{
 	}
 
-	uint64_t DMAController::read(uint32_t address)
+	uint32_t DMAController::read(uint32_t address)
 	{
 		assert(address >= 0x1F801080 && address <= 0x1F8010F4 || address >= 0x1F801500 && address <= 0x1F80157C);
 
@@ -78,7 +78,7 @@ namespace iop
 		return *ptr;
 	}
 
-	void DMAController::write(uint32_t address, uint64_t data)
+	void DMAController::write(uint32_t address, uint32_t data)
 	{
 		assert(address >= 0x1F801080 && address <= 0x1F8010F4 || address >= 0x1F801500 && address <= 0x1F80157C);
 

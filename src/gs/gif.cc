@@ -26,7 +26,7 @@ namespace gs
 		emulator->add_handler(PAGE1, this, &GIF::read, &GIF::write);
 	}
 	
-	uint64_t GIF::read(uint32_t addr)
+	uint32_t GIF::read(uint32_t addr)
 	{
 		assert(addr <= 0x100030A0);
 
@@ -38,7 +38,7 @@ namespace gs
 		return *ptr;
 	}
 	
-	void GIF::write(uint32_t addr, uint64_t data)
+	void GIF::write(uint32_t addr, uint32_t data)
 	{
 		assert(addr <= 0x100030A0);
 

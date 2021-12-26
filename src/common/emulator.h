@@ -56,7 +56,7 @@ namespace common
         template <typename T, ComponentID id>
         void write(uint32_t addr, T data);
 
-        template <typename R, typename W>
+        template <typename T = uint32_t, typename R, typename W>
         void add_handler(int page, Component* c, R reader, W writer);
 
         static const uint32_t calculate_page(const uint32_t addr);
@@ -78,7 +78,7 @@ namespace common
         uint8_t rdram_sdevid = 0;
 
         /* Handlers */
-        Handler* handlers[0x20000] = {};
+        HandlerBase* handlers[0x20000] = {};
 
         /* Utilities */
         const char* component_name[2] = { "EE", "IOP" };
@@ -96,7 +96,7 @@ namespace common
         else /* Otherwise handle specific address diferently. */
         {
             auto page = Emulator::calculate_page(paddr);
-            auto& handler = handlers[page];
+            auto handler = (Handler<T>*)handlers[page];
 
             if (handler)
             {
@@ -115,7 +115,7 @@ namespace common
     inline void Emulator::write(uint32_t paddr, T data)
     {
         auto page = Emulator::calculate_page(paddr);
-        auto handler = handlers[page];
+        auto handler = (Handler<T>*)handlers[page];
 
         if (handler)
         {
@@ -127,13 +127,13 @@ namespace common
         }
     }
     
-    template <typename R, typename W>
+    template <typename T, typename R, typename W>
     inline void Emulator::add_handler(int page, Component* c, R reader, W writer)
     {
-        auto h = new Handler;
+        auto h = new Handler<T>;
         h->c = c;
-        h->writer = (Writer)writer;
-        h->reader = (Reader)reader;
+        h->writer = (Writer<T>)writer;
+        h->reader = (Reader<T>)reader;
         handlers[page] = h;
     }
 }
