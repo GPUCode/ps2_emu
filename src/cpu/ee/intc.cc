@@ -1,6 +1,12 @@
 #include <cpu/ee/intc.h>
 #include <cpu/ee/ee.h>
 
+static const char* REGS[2] =
+{
+	"INTC_STAT",
+	"INTC_STAT"
+};
+
 namespace ee
 {
 	INTC::INTC(EmotionEngine* ee) :
@@ -13,7 +19,10 @@ namespace ee
 	uint64_t INTC::read(uint32_t addr)
 	{
 		auto offset = (addr >> 4) & 0xf;
-		return *(uint32_t*)&regs + offset;
+		auto ptr = (uint32_t*)&regs + offset;
+
+		fmt::print("[INTC] Reading {:#x} from {}\n", *ptr, REGS[offset]);
+		return *ptr;
 	}
 
 	void INTC::write(uint32_t addr, uint64_t data)
@@ -27,10 +36,13 @@ namespace ee
 
 		/* Set appropriate COP0 status bits */
 		cpu->cop0.cause.ip0_pending = (regs.intc_mask & regs.intc_stat);
+
+		fmt::print("[INTC] Writing {:#x} to {}\n", data, REGS[offset]);
 	}
 
 	void INTC::trigger(Interrupt intr)
 	{
+		fmt::print("[INTC] Triggering interrupt {:d}\n", intr);
 		regs.intc_stat |= (1 << intr);
 
 		/* Set appropriate COP0 status bits */
