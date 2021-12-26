@@ -203,7 +203,9 @@ namespace iop
         case 0x1f801100 ... 0x1f80112c:
         case 0x1f801480 ... 0x1f8014ac:
             return timers.write(paddr, data);
-        case 0x1f801578: /* This just causes too much logspam */
+        case 0x1f801578: /* These just causes too much logspam */
+        case 0x1f801450:
+        case 0xfffe0130:
             return;
         default:
             emulator->write<T, common::ComponentID::IOP>(paddr, data);
