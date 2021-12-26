@@ -22,8 +22,7 @@ namespace gs
 	GIF::GIF(common::Emulator* parent) :
 		emulator(parent)
 	{
-		uint32_t PAGE1 = common::Emulator::calculate_page(0x10003000);
-		emulator->add_handler(PAGE1, this, &GIF::read, &GIF::write);
+		emulator->add_handler(0x10003000, this, &GIF::read, &GIF::write);
 	}
 	
 	uint32_t GIF::read(uint32_t addr)

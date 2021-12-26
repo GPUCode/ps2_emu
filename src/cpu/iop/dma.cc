@@ -10,11 +10,8 @@ namespace iop
 		emulator(emu)
 	{
 		/* Register our functions to the Emulator. */
-		const uint32_t PAGE1 = common::Emulator::calculate_page(0x1f801080);
-		const uint32_t PAGE2 = common::Emulator::calculate_page(0x1f801500);
-		
-		emulator->add_handler(PAGE1, this, &DMAController::read, &DMAController::write);
-		emulator->add_handler(PAGE2, this, &DMAController::read, &DMAController::write);
+		emulator->add_handler(0x1f801080, this, &DMAController::read, &DMAController::write);
+		emulator->add_handler(0x1f801500, this, &DMAController::read, &DMAController::write);
 	}
 
 	void DMAController::tick()

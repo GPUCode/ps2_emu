@@ -58,7 +58,7 @@ namespace common
         void write(uint32_t addr, T data);
 
         template <typename T = uint32_t, typename R, typename W>
-        void add_handler(int page, Component* c, R reader, W writer);
+        void add_handler(uint32_t address, Component* c, R reader, W writer);
 
         static const uint32_t calculate_page(const uint32_t addr);
 
@@ -135,8 +135,10 @@ namespace common
     }
     
     template <typename T, typename R, typename W>
-    inline void Emulator::add_handler(int page, Component* c, R reader, W writer)
+    inline void Emulator::add_handler(uint32_t address, Component* c, R reader, W writer)
     {
+        uint32_t page = calculate_page(address);
+
         auto h = new Handler<T>;
         h->c = c;
         h->writer = (Writer<T>)writer;
