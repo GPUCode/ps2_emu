@@ -15,6 +15,11 @@ namespace iop
     class IOProcessor;
 }
 
+namespace gs
+{
+    struct GIF;
+}
+
 namespace common
 {
     constexpr uint32_t KUSEG_MASKS[8] = 
@@ -64,9 +69,10 @@ namespace common
         std::unique_ptr<ee::EmotionEngine> ee;
         std::unique_ptr<iop::IOProcessor> iop;
         std::unique_ptr<iop::DMAController> iop_dma;
+        std::unique_ptr<gs::GIF> gif;
 
         /* Memory - Registers */
-        uint8_t * bios;
+        uint8_t* bios;
 
         uint32_t MCH_RICM = 0, MCH_DRD = 0;
         uint8_t rdram_sdevid = 0;

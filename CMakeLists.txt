@@ -19,6 +19,7 @@ add_executable(${PROJECT_NAME}
 	"src/cpu/iop/timers.cc" 
 	"src/cpu/ee/intc.cc"
 	"src/cpu/iop/intr.cc"
+	"src/gs/gif.cc"
 )
 
 # Link to all the required conan libs
