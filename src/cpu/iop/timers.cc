@@ -9,28 +9,29 @@ namespace iop
 	{
 	}
 	
-	void Timers::tick(uint32_t cycles)
+	void Timers::tick()
 	{
-		timers[5].count += cycles;
-		if (timers[5].count == timers[5].target)
+		auto& timer = timers[5];
+
+		timer.count++;
+		if (timer.count == timer.target)
 		{
-			timers[5].mode.compare_intr_raised = true;
-			if (timers[5].mode.compare_intr)
+			timer.mode.compare_intr_raised = true;
+			if (timer.mode.compare_intr)
 			{
-				__debugbreak();
 				iop->intr.trigger(Interrupt::Timer5);
 			}
 
-			if (timers[5].mode.reset_on_intr)
+			if (timer.mode.reset_on_intr)
 			{
-				timers[5].count = 0;
+				timer.count = 0;
 			}
 		}
 
-		if (timers[5].count > 0xFFFFFFFF)
+		if (timer.count > 0xFFFFFFFF)
 		{
-			timers[5].mode.overflow_intr_raised = true;
-			if (timers[5].mode.overflow_intr)
+			timer.mode.overflow_intr_raised = true;
+			if (timer.mode.overflow_intr)
 			{
 				iop->intr.trigger(Interrupt::Timer5);
 			}

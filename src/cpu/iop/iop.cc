@@ -94,7 +94,7 @@ namespace iop
             exception(Exception::Interrupt);
 
         /* Increment timers */
-        timers.tick(1);
+        timers.tick();
     }
 
     void IOProcessor::op_special()

@@ -41,7 +41,7 @@ namespace iop
 		~Timers() = default;
 
 		/* Add cycles to the timer. */
-		void tick(uint32_t cycles);
+		void tick();
 
 		/* Read/Write to the timer. */
 		uint32_t read(uint32_t address);
