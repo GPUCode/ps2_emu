@@ -19,6 +19,7 @@ namespace iop
 namespace gs
 {
     struct GIF;
+    struct GraphicsSynthesizer;
 }
 
 namespace common
@@ -71,6 +72,7 @@ namespace common
         std::unique_ptr<iop::IOProcessor> iop;
         std::unique_ptr<iop::DMAController> iop_dma;
         std::unique_ptr<gs::GIF> gif;
+        std::unique_ptr<gs::GraphicsSynthesizer> gs;
 
         /* Memory - Registers */
         uint8_t* bios;

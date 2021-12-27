@@ -52,8 +52,6 @@ namespace ee
         }
     };
 
-    using uint128_t = unsigned __int128;
-
     union Register
     {
         uint128_t qword;

@@ -2,6 +2,7 @@
 #include <cpu/ee/ee.h>
 #include <cpu/iop/iop.h>
 #include <gs/gif.h>
+#include <gs/gs.h>
 #include <cassert>
 
 int cycles_executed = 0;
@@ -22,6 +23,7 @@ namespace common
         iop = std::make_unique<iop::IOProcessor>(this);
         iop_dma = std::make_unique<iop::DMAController>(this);
         gif = std::make_unique<gs::GIF>(this);
+        gs = std::make_unique<gs::GraphicsSynthesizer>(this);
     }
 
     Emulator::~Emulator()

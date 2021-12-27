@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+using uint128_t = unsigned __int128;
+
 namespace common
 {
 	/* This doesn't serve any functional purpose (for now) aside from
@@ -33,7 +35,7 @@ namespace common
 		Reader<T> reader = nullptr;
 		Writer<T> writer = nullptr;
 
-		inline void operator()(uint32_t addr, uint64_t data) { (c->*writer)(addr, data); }
-		inline uint64_t operator()(uint32_t addr) { return (c->*reader)(addr); }
+		inline void operator()(uint32_t addr, T data) { (c->*writer)(addr, data); }
+		inline T operator()(uint32_t addr) { return (c->*reader)(addr); }
 	};
 }
