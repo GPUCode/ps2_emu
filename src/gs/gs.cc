@@ -18,7 +18,12 @@ namespace gs
 	GraphicsSynthesizer::GraphicsSynthesizer(common::Emulator* parent) :
 		emulator(parent)
 	{
-		emulator->add_handler(0x12001000, this, &GraphicsSynthesizer::read_priv, &GraphicsSynthesizer::write_priv);
+		uint32_t addresses[3] = { 0x12000000, 0x12000080, 0x12001000 };
+		auto reader = &GraphicsSynthesizer::read_priv;
+		auto writer = &GraphicsSynthesizer::write_priv;
+
+		for (auto addr : addresses)
+			emulator->add_handler<uint64_t>(addr, this, reader, writer);
 	}
 
 	uint64_t GraphicsSynthesizer::read_priv(uint32_t addr)
