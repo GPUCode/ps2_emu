@@ -93,8 +93,8 @@ namespace ee
 				continue;
 
 			/* Increment internal counter according to ratio */
-			timer.counter = (timer.counter + 1) % (timer.ratio + 1);
-			timer.count += (timer.counter == timer.ratio);
+			timer.counter = (timer.counter + 1) % (timer.ratio);
+			timer.count += (timer.counter == timer.ratio - 1);
 
 			/* Target reached */
 			if (timer.count == timer.comp)
