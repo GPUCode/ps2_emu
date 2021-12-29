@@ -12,7 +12,7 @@ constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasi
 namespace ee
 {
     EmotionEngine::EmotionEngine(common::Emulator* parent) :
-        emulator(parent), intc(this)
+        emulator(parent), intc(this), timers(parent, &intc)
     {
         /* Open output log */
         disassembly = std::fopen("disassembly_ee.log", "w");
@@ -113,6 +113,9 @@ namespace ee
 
         /* Increment COP0 counter */
         cop0.count++;
+
+        /* Tick the timers */
+        timers.tick();
 
         /* Check for interrupts */
         if (intc.int_pending())

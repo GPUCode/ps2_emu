@@ -14,6 +14,7 @@ add_executable(${PROJECT_NAME}
 	"src/main.cc"
 	"src/common/emulator.cc"
 	"src/cpu/ee/ee.cc"
+	"src/cpu/ee/timers.cc"
 	"src/cpu/iop/iop.cc"
 	"src/cpu/iop/dma.cc" 
 	"src/cpu/iop/timers.cc" 

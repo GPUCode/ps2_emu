@@ -40,7 +40,7 @@ namespace ee
 		fmt::print("[INTC] Writing {:#x} to {}\n", data, REGS[offset]);
 	}
 
-	void INTC::trigger(Interrupt intr)
+	void INTC::trigger(uint32_t intr)
 	{
 		fmt::print("[INTC] Triggering interrupt {:d}\n", intr);
 		regs.intc_stat |= (1 << intr);

@@ -39,7 +39,7 @@ namespace ee
 		uint64_t read(uint32_t addr);
 		void write(uint32_t addr, uint64_t data);
 
-		void trigger(Interrupt intr);
+		void trigger(uint32_t intr);
 		bool int_pending();
 
 	private:

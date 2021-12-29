@@ -2,6 +2,7 @@
 #include <common/emulator.h>
 #include <cpu/ee/cop0.h>
 #include <cpu/ee/intc.h>
+#include <cpu/ee/timers.h>
 
 namespace ee
 {
@@ -159,6 +160,7 @@ namespace ee
 
         /* Interrupts/Timers */
         INTC intc;
+        Timers timers;
 
         /* Logging */
         std::FILE* disassembly;
