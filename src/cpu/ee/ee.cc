@@ -246,6 +246,8 @@ namespace ee
         case 0b001010: op_movz(); break;
         case 0b010100: op_dsllv(); break;
         case 0b000100: op_sllv(); break;
+        case 0b000111: op_srav(); break;
+        case 0b100111: op_nor(); break;
         default:
             fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		    std::abort();
@@ -801,6 +803,30 @@ namespace ee
         gpr[rd].dword[0] = (int32_t)(reg << sa);
 
         log("SLLV: GPR[{:d}] = GPR[{:d}] ({:#x}) << GPR[{:d}] ({:d})\n", rd, rt, reg, rs, sa);
+    }
+
+    void EmotionEngine::op_srav()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        int32_t reg = (int32_t)gpr[rt].word[0];
+        uint16_t sa = gpr[rs].word[0] & 0x3F;
+        gpr[rd].word[0] = reg >> sa;
+
+        log("SRAV: GPR[{:d}] = GPR[{:d}] ({:#x}) >> GPR[{:d}] ({:d})\n", rd, rt, reg, rs, sa);
+    }
+
+    void EmotionEngine::op_nor()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        gpr[rd].dword[0] = ~(gpr[rs].dword[0] | gpr[rt].dword[0]);
+        
+        log("NOR: GPR[{:d}] = GPR[{:d}] ({:#x}) NOR GPR[{:d}] ({:d})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
     }
 
     void EmotionEngine::op_por()

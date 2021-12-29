@@ -126,7 +126,7 @@ namespace ee
         void op_sh(); void op_madd(); void op_divu1(); void op_mflo1();
         void op_dsrav(); void op_xori(); void op_mult1(); void op_movz();
         void op_dsllv(); void op_daddiu(); void op_sq(); void op_lh();
-        void op_cache(); void op_sllv();
+        void op_cache(); void op_sllv(); void op_srav(); void op_nor();
 
         /* Parallel instructions */
         void op_por();
