@@ -22,6 +22,7 @@ add_executable(${PROJECT_NAME}
 	"src/cpu/iop/intr.cc"
 	"src/gs/gif.cc"
 	"src/gs/gs.cc"
+	"src/cpu/ee/dmac.cc"
 )
 
 # Link to all the required conan libs

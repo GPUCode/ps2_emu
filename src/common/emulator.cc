@@ -1,5 +1,6 @@
 #include <common/emulator.h>
 #include <cpu/ee/ee.h>
+#include <cpu/ee/dmac.h>
 #include <cpu/iop/iop.h>
 #include <gs/gif.h>
 #include <gs/gs.h>
@@ -24,6 +25,7 @@ namespace common
         iop_dma = std::make_unique<iop::DMAController>(this);
         gif = std::make_unique<gs::GIF>(this);
         gs = std::make_unique<gs::GraphicsSynthesizer>(this);
+        dmac = std::make_unique<ee::DMAController>(this);
     }
 
     Emulator::~Emulator()

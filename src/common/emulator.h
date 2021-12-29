@@ -9,6 +9,7 @@
 namespace ee 
 {
     class EmotionEngine;
+    struct DMAController;
 }
 
 namespace iop 
@@ -73,6 +74,7 @@ namespace common
         std::unique_ptr<iop::DMAController> iop_dma;
         std::unique_ptr<gs::GIF> gif;
         std::unique_ptr<gs::GraphicsSynthesizer> gs;
+        std::unique_ptr<ee::DMAController> dmac;
 
         /* Memory - Registers */
         uint8_t* bios;
