@@ -2,6 +2,7 @@
 #include <cpu/ee/ee.h>
 #include <cpu/ee/dmac.h>
 #include <cpu/iop/iop.h>
+#include <cpu/vu/vu0.h>
 #include <gs/gif.h>
 #include <gs/gs.h>
 #include <cassert>
@@ -26,6 +27,7 @@ namespace common
         gif = std::make_unique<gs::GIF>(this);
         gs = std::make_unique<gs::GraphicsSynthesizer>(this);
         dmac = std::make_unique<ee::DMAController>(this);
+        vu0 = std::make_unique<vu::VU0>(ee.get());
     }
 
     Emulator::~Emulator()

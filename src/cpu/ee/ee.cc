@@ -1,4 +1,5 @@
 #include <cpu/ee/ee.h>
+#include <cpu/vu/vu0.h>
 #include <common/emulator.h>
 #include <fmt/color.h>
 
@@ -73,6 +74,7 @@ namespace ee
         {
         case COP0_OPCODE: op_cop0(); break;
         case SPECIAL_OPCODE: op_special(); break;
+        case 0b010010: op_cop2(); break;
         case 0b101011: op_sw(); break;
         case 0b001010: op_slti(); break;
         case 0b000101: op_bne(); break;
@@ -827,6 +829,29 @@ namespace ee
         gpr[rd].dword[0] = ~(gpr[rs].dword[0] | gpr[rt].dword[0]);
         
         log("NOR: GPR[{:d}] = GPR[{:d}] ({:#x}) NOR GPR[{:d}] ({:d})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    }
+
+    void EmotionEngine::op_cop2()
+    {
+        auto& vu0 = emulator->vu0;
+
+        uint32_t fmt = (instr.value >> 21) & 0x1f;
+        switch (fmt)
+        {
+        case 0b00010:
+            return vu0->op_cfc2(instr);
+        case 0b00110:
+            return vu0->op_ctc2(instr);
+        case 0b00001:
+            return vu0->op_qmfc2(instr);
+        case 0b00101:
+            return vu0->op_qmtc2(instr);
+        case 0b10000 ... 0b11111:
+            return vu0->special1(instr);
+        default:
+            fmt::print("[ERROR] Unimplemented COP2 instruction {:#07b}\n", fmt);
+            std::abort();
+        }
     }
 
     void EmotionEngine::op_por()

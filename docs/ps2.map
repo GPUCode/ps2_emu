@@ -1,0 +1,265 @@
+#	PS2 Memory Map
+#	$Id: ps2.map,v 1.3 2002/01/13 21:44:31 cvs Exp $
+10000000:
+.qword	T0_COUNT
+.qword	T0_MODE
+.qword	T0_COMP
+.qword	T0_HOLD
+10000800:
+.qword	T1_COUNT
+.qword	T1_MODE
+.qword	T1_COMP
+.qword	T1_HOLD
+10001000:
+.qword	T2_COUNT
+.qword	T2_MODE
+.qword	T2_COMP
+10001800:
+.qword	T3_COUNT
+.qword	T3_MODE
+.qword	T3_COMP
+10002000:
+.qword	IPU_CMD
+.qword	IPU_CTRL
+.qword	IPU_BP
+.qword	IPU_TOP
+10003000:
+.qword	GIF_CTRL
+.qword	GIF_MODE
+.qword	GIF_STAT
+10003040:
+.qword	GIF_TAG0
+.qword	GIF_TAG1
+.qword	GIF_TAG2
+.qword	GIF_TAG3
+.qword	GIF_CNT
+.qword	GIF_P3CNT
+.qword	GIF_P3TAG
+10003800:
+.qword	VIF0_STAT
+.qword	VIF0_FBRST
+.qword	VIF0_ERR
+.qword	VIF0_MARK
+.qword	VIF0_CYCLE
+.qword	VIF0_MODE
+.qword	VIF0_NUM
+.qword	VIF0_MASK
+.qword	VIF0_CODE
+.qword	VIF0_ITOPS
+100038d0:
+.qword	VIF0_ITOP
+10003900:
+.qword	VIF0_R0
+.qword	VIF0_R1
+.qword	VIF0_R2
+.qword	VIF0_R3
+.qword	VIF0_C0
+.qword	VIF0_C1
+.qword	VIF0_C2
+.qword	VIF0_C3
+10003c00:
+.qword	VIF1_STAT
+.qword	VIF1_FBRST
+.qword	VIF1_ERR
+.qword	VIF1_MARK
+.qword	VIF1_CYCLE
+.qword	VIF1_MODE
+.qword	VIF1_NUM
+.qword	VIF1_MASK
+.qword	VIF1_CODE
+.qword	VIF1_ITOPS
+.qword	VIF1_BASE
+.qword	VIF1_OFST
+.qword	VIF1_TOPS
+.qword	VIF1_ITOP
+.qword	VIF1_TOP
+10003d00:
+.qword	VIF1_R0
+.qword	VIF1_R1
+.qword	VIF1_R2
+.qword	VIF1_R3
+.qword	VIF1_C0
+.qword	VIF1_C1
+.qword	VIF1_C2
+.qword	VIF1_C3
+#FIFO
+10004000:
+.qword	VIF0_FIFO(write)
+10005000:
+.qword	VIF1_FIFO(read/write)
+10006000:
+.qword	GIF_FIFO(write)
+10007000:
+.qword	IPU_out_FIFO(read)
+.qword	IPU_in_FIFO(write)
+#DMAC
+10008000:
+.qword	D0_CHCR
+.qword	D0_MADR
+.qword	D0_QWC
+.qword	D0_TADR
+.qword	D0_ASR0
+.qword	D0_ASR1
+10009000:
+.qword	D1_CHCR
+.qword	D1_MADR
+.qword	D1_QWC
+.qword	D1_TADR
+.qword	D1_ASR0
+.qword	D1_ASR1
+1000a000:
+.qword	D2_CHCR
+.qword	D2_MADR
+.qword	D2_QWC
+.qword	D2_TADR
+.qword	D2_ASR0
+.qword	D2_ASR1
+1000b000:
+.qword	D3_CHCR
+.qword	D3_MADR
+.qword	D3_QWC
+1000b400:
+.qword	D4_CHCR
+.qword	D4_MADR
+.qword	D4_QWC
+.qword	D4_TADR
+1000c000:
+.qword	D5_CHCR
+.qword	D5_MADR
+.qword	D5_QWC
+1000c400:
+.qword	D6_CHCR
+.qword	D6_MADR
+.qword	D6_QWC
+1000c800:
+.qword	D7_CHCR
+.qword	D7_MADR
+.qword	D7_QWC
+1000d000:
+.qword	D8_CHCR
+.qword	D8_MADR
+.qword	D8_QWC
+1000d080:
+.qword	D8_SADR
+1000d400:
+.qword	D9_CHCR
+.qword	D9_MADR
+.qword	D9_QWC
+.qword	D9_TADR
+1000d480:
+.qword	D9_SADR
+# DMAC
+1000e000:
+.qword	D_CTRL
+.qword	D_STAT
+.qword	D_PCR
+.qword	D_SQWC
+.qword	D_RBSR
+.qword	D_RBOR
+.qword	D_STADR
+# INTC
+1000f000:
+.qword	I_STAT
+.qword	I_MASK
+1000f180:
+.byte KPUTCHAR
+# SIF
+1000f230:
+.qword	SB_SMFLG
+# DMAC
+1000f520:
+.qword	D_ENABLER
+1000f590:
+.qword	D_ENABLEW
+# VU0
+11000000:
+.qword	VU Micro Mem0
+11004000:
+.qword	VU Mem0
+11008000:
+.qword	VU Micro Mem1
+1100c000:
+.qword	VU Mem1
+
+# GS Special
+12000000:
+.qword	GS_PMODE
+.qword	GS_SMODE1
+.qword	GS_SMODE2
+.qword	GS_SRFSH
+.qword	GS_SYNCH1
+.qword	GS_SYNCH2
+.qword	GS_SYNCV
+.qword	GS_DISPFB1
+.qword	GS_DISPLAY1
+.qword	GS_DISPFB2
+.qword	GS_DISPLAY2
+.qword	GS_EXTBUF
+.qword	GS_EXTDATA
+.qword	GS_EXTWRITE
+.qword	GS_BGCOLOR
+12001000:
+.qword	GS_CSR
+.qword	GS_IMR
+12001040:
+.qword	GS_BUSDIR
+12001080:
+.qword	GS_SIGLBLID
+14000028:
+.word	SPD_R_INTR_STAT
+.half	SPD_PIO_DIR
+.half	SPD_PIO_DATA
+14000032:
+.word	SPD_R_XFR_CTRL
+14000040:
+.dword	PS2HDD_IDE0
+1400004e:
+.word	PS2HDD_IDE0_PORT
+14000064:
+.word	SPD_R_IF_CTRL
+1f801600:
+.qword: SIF_IRQ?
+1f402005:
+.byte CDVDFSV
+1f40200a:
+.byte CDVDFSV
+1f801404:
+.word SPU
+1f80140c:
+.word SPU
+1f801414:
+.word SPU
+1f900800:
+.word SPU
+1f801570:
+.word SPU
+1f801014:
+.word SPU
+1f9007c0:
+.half SPU
+1f9007c8:
+.half SPU
+#
+bfc00000:
+.code V_RESET_NMI
+80000080:
+.code V_COUNTER
+bfc00280:
+.code V_COUNTER
+80000100:
+.code V_DEBUG
+bfc00300:
+.code V_DEBUG
+80000200:
+.code V_INTERRUPT
+bfc00400:
+.code V_INTERRUPT
+80000180:
+.code V_COMMON
+bfc00380:
+.code V_COMMON
+80000000:
+.code V_TLB_REFILL
+bfc00200:
+.code V_TLB_REFILL
+

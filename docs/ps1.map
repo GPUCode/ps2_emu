@@ -1,0 +1,375 @@
+# $Id: PS1.MAP,v 1.1 2001/08/27 17:40:51 cvs Exp $
+1f801014:
+.word	spu_delay
+.word	dv5_delay
+.word
+.word	com_delay
+#
+#	Serial I/O
+#
+1f801040:
+.byte	sio_data
+1f801044:
+.half	sio_status
+1f801048:
+.half	sio_mode
+1f80104a:
+.half	sio_cntl
+1f80104e:
+.half	sio_baud
+1f801050:
+.byte	ser_data
+1f801054:
+.half	ser_status
+1f801058:
+.half	ser_mode
+1f80105a:
+.half	ser_cntl
+1f80105e:
+.half	ser_baud
+
+1f801060:
+.word	RAM size
+1f801070:
+.half	i_reg	; äÑÇËçûÇ›ê›íË
+.half	i_regHi
+.half	i_mask	; äÑÇËçûÇ›É}ÉXÉN
+.half	i_maskHi
+
+#
+#	DMA
+#
+1f801080:		# MDEC in
+.word	DMAaddr-MDEC in	;|1f madr                         00|
+.word	DMAbcr-MDEC in	;|1f Amount of blocks  10|0f Size 00|
+.word	DMAchcr-MDEC in	;|1f-19|18|17-0c|0b|0a|09|08|07 01|00|
+.undef			;|    0|Tr|    0| 0|Li|Co| 0|    0|Dr|
+1f801090:		# MDEC out
+.word	DMAaddr-MDEC out;|1f madr                         00|
+.word	DMAbcr-MDEC out	;|1f Amount of blocks  10|0f Size 00|
+.word	DMAchcr-MDEC out;|1f-19|18|17-0c|0b|0a|09|08|07 01|00|
+.undef			;|    0|Tr|    0| 0|Li|Co| 0|    0|Dr|
+1f8010a0:		# GPU
+.word	DMAaddr-GPU	;|1f madr                         00|
+.word	DMAbcr-GPU	;|1f Amount of blocks  10|0f Size 00|
+.word	DMAchcr-GPU	;|1f-19|18|17-0c|0b|0a|09|08|07 01|00|
+.undef			;|    0|Tr|    0| 0|Li|Co| 0|    0|Dr|
+1f8010b0:		# CDROM
+.word	DMAaddr-CDROM	;|1f madr                         00|
+.word	DMAbcr-CDROM	;|1f Amount of blocks  10|0f Size 00|
+.word	DMAchcr-CDROM	;|1f-19|18|17-0c|0b|0a|09|08|07 01|00|
+.undef			;|    0|Tr|    0| 0|Li|Co| 0|    0|Dr|
+1f8010c0:		# SPU
+.word	DMAaddr-SPU	;|1f madr                         00|
+.word	DMAbcr-SPU	;|1f Amount of blocks  10|0f Size 00|
+.word	DMAchcr-SPU	;|1f-19|18|17-0c|0b|0a|09|08|07 01|00|
+.undef			;|    0|Tr|    0| 0|Li|Co| 0|    0|Dr|
+1f8010d0:		# PIO
+.word	DMAaddr-PIO	;|1f madr                         00|
+.word	DMAbcr-PIO	;|1f Amount of blocks  10|0f Size 00|
+.word	DMAchcr-PIO	;|1f-19|18|17-0c|0b|0a|09|08|07 01|00|
+.undef			;|    0|Tr|    0| 0|Li|Co| 0|    0|Dr|
+1f8010e0:		# OTC
+.word	DMAaddr-OTC	;|1f madr                         00|
+.word	DMAbcr-OTC	;|1f Amount of blocks  10|0f Size 00|
+.word	DMAchcr-OTC	;|1f-19|18|17-0c|0b|0a|09|08|07 01|00|
+.undef			;|    0|Tr|    0| 0|Li|Co| 0|    0|Dr|
+1f8010f0:
+.word	d_pcr
+.word	d_icr
+#
+#	Root Counters
+#
+1f801100:
+.word	pixel_count	;|31 Garbage 16|15 Count 0|
+.word	pixel_mode	;|31Garbage10|9Div|8Clc|7|6Iq2|5|4Iq1|3Tar|21|En 0|
+.word	pixel_target	;|15 Target 0|
+1f801110:
+.word	horiz_count	;|31 Garbage 16|15 Count 0|
+.word	horiz_mode	;|31Garbage10|9Div|8Clc|7|6Iq2|5|4Iq1|3Tar|21|En 0|
+.word	horiz_target	;|15 Target 0|
+1f801120:
+.word	1/8_count	;|31 Garbage 16|15 Count 0|
+.word	1/8_mode	;|31Garbage10|9Div|8Clc|7|6Iq2|5|4Iq1|3Tar|21|En 0|
+.word	1/8_target	;|15 Target 0|
+1f801130:
+.word	vert_count	;|31 Garbage 16|15 Count 0|
+.word	vert_mode	;|31Garbage10|9Div|8Clc|7|6Iq2|5|4Iq1|3Tar|21|En 0|
+.word	vert_target	;|15 Target 0|
+#
+#	CDROM
+#
+1f801800:
+.byte	cdrom_reg0
+.byte	cdrom_reg1
+.byte	cdrom_reg2
+.byte	cdrom_reg3
+#
+#	GPU
+#
+1f801810:
+.word	gpu_Data
+.word	gpu_Cntl
+#
+#	MDEC
+#
+1f801820:
+.word	mdec0
+.word	mdec1
+#
+#	SPU
+#
+1f801c00:
+.half	spuCh0_vol-L
+.half	spuCh0_vol-R
+.half	spuCh0_pitch	; $1000=44.1Khz
+.half	spuCh0_waveAddr
+.half	spuCh0_Attack/Decay/Sustain level
+.half	spuCh0_Sustain/Release Rate.
+.half	spuCh0_currentADSR-Vol
+.half	spuCh0_RepeatAddr
+1f801c10:
+.half	spuCh1_vol-L
+.half	spuCh1_vol-R
+.half	spuCh1_pitch	; $1000=44.1Khz
+.half	spuCh1_waveAddr
+.half	spuCh1_atack,dekey,susLev
+.half	spuCh1_susRate,relRate
+.half	spuCh1_ADSR-Vol
+.half	spuCh1_LoopPoint
+1f801c20:
+.half	spuCh2_vol-L
+.half	spuCh2_vol-R
+.half	spuCh2_pitch	; $1000=44.1Khz
+.half	spuCh2_waveAddr
+.half	spuCh2_atack,dekey,susLev
+.half	spuCh2_susRate,relRate
+.half	spuCh2_ADSR-Vol
+.half	spuCh2_LoopPoint
+1f801c30:
+.half	spuCh3_vol-L
+.half	spuCh3_vol-R
+.half	spuCh3_pitch	; $1000=44.1Khz
+.half	spuCh3_waveAddr
+.half	spuCh3_atack,dekey,susLev
+.half	spuCh3_susRate,relRate
+.half	spuCh3_ADSR-Vol
+.half	spuCh3_LoopPoint
+1f801c40:
+.half	spuCh4_vol-L
+.half	spuCh4_vol-R
+.half	spuCh4_pitch	; $1000=44.1Khz
+.half	spuCh4_waveAddr
+.half	spuCh4_atack,dekey,susLev
+.half	spuCh4_susRate,relRate
+.half	spuCh4_ADSR-Vol
+.half	spuCh4_LoopPoint
+1f801c50:
+.half	spuCh5_vol-L
+.half	spuCh5_vol-R
+.half	spuCh5_pitch	; $1000=44.1Khz
+.half	spuCh5_waveAddr
+.half	spuCh5_atack,dekey,susLev
+.half	spuCh5_susRate,relRate
+.half	spuCh5_ADSR-Vol
+.half	spuCh5_LoopPoint
+1f801c60:
+.half	spuCh6_vol-L
+.half	spuCh6_vol-R
+.half	spuCh6_pitch	; $1000=44.1Khz
+.half	spuCh6_waveAddr
+.half	spuCh6_atack,dekey,susLev
+.half	spuCh6_susRate,relRate
+.half	spuCh6_ADSR-Vol
+.half	spuCh6_LoopPoint
+1f801c70:
+.half	spuCh7_vol-L
+.half	spuCh7_vol-R
+.half	spuCh7_pitch	; $1000=44.1Khz
+.half	spuCh7_waveAddr
+.half	spuCh7_atack,dekey,susLev
+.half	spuCh7_susRate,relRate
+.half	spuCh7_ADSR-Vol
+.half	spuCh7_LoopPoint
+1f801c80:
+.half	spuCh8_vol-L
+.half	spuCh8_vol-R
+.half	spuCh8_pitch	; $1000=44.1Khz
+.half	spuCh8_waveAddr
+.half	spuCh8_atack,dekey,susLev
+.half	spuCh8_susRate,relRate
+.half	spuCh8_ADSR-Vol
+.half	spuCh8_LoopPoint
+1f801c90:
+.half	spuCh9_vol-L
+.half	spuCh9_vol-R
+.half	spuCh9_pitch	; $1000=44.1Khz
+.half	spuCh9_waveAddr
+.half	spuCh9_atack,dekey,susLev
+.half	spuCh9_susRate,relRate
+.half	spuCh9_ADSR-Vol
+.half	spuCh9_LoopPoint
+1f801ca0:
+.half	spuCh10_vol-L
+.half	spuCh10_vol-R
+.half	spuCh10_pitch	; $1000=44.1Khz
+.half	spuCh10_waveAddr
+.half	spuCh10_atack,dekey,susLev
+.half	spuCh10_susRate,relRate
+.half	spuCh10_ADSR-Vol
+.half	spuCh10_LoopPoint
+1f801cb0:
+.half	spuCh11_vol-L
+.half	spuCh11_vol-R
+.half	spuCh11_pitch	; $1000=44.1Khz
+.half	spuCh11_waveAddr
+.half	spuCh11_atack,dekey,susLev
+.half	spuCh11_susRate,relRate
+.half	spuCh11_ADSR-Vol
+.half	spuCh11_LoopPoint
+1f801cc0:
+.half	spuCh12_vol-L
+.half	spuCh12_vol-R
+.half	spuCh12_pitch	; $1000=44.1Khz
+.half	spuCh12_waveAddr
+.half	spuCh12_atack,dekey,susLev
+.half	spuCh12_susRate,relRate
+.half	spuCh12_ADSR-Vol
+.half	spuCh12_LoopPoint
+1f801cd0:
+.half	spuCh13_vol-L
+.half	spuCh13_vol-R
+.half	spuCh13_pitch	; $1000=44.1Khz
+.half	spuCh13_waveAddr
+.half	spuCh13_atack,dekey,susLev
+.half	spuCh13_susRate,relRate
+.half	spuCh13_ADSR-Vol
+.half	spuCh13_LoopPoint
+1f801ce0:
+.half	spuCh14_vol-L
+.half	spuCh14_vol-R
+.half	spuCh14_pitch	; $1000=44.1Khz
+.half	spuCh14_waveAddr
+.half	spuCh14_atack,dekey,susLev
+.half	spuCh14_susRate,relRate
+.half	spuCh14_ADSR-Vol
+.half	spuCh14_LoopPoint
+1f801cf0:
+.half	spuCh15_vol-L
+.half	spuCh15_vol-R
+.half	spuCh15_pitch	; $1000=44.1Khz
+.half	spuCh15_waveAddr
+.half	spuCh15_atack,dekey,susLev
+.half	spuCh15_susRate,relRate
+.half	spuCh15_ADSR-Vol
+.half	spuCh15_LoopPoint
+1f801d00:
+.half	spuCh16_vol-L
+.half	spuCh16_vol-R
+.half	spuCh16_pitch	; $1000=44.1Khz
+.half	spuCh16_waveAddr
+.half	spuCh16_atack,dekey,susLev
+.half	spuCh16_susRate,relRate
+.half	spuCh16_ADSR-Vol
+.half	spuCh16_LoopPoint
+1f801d10:
+.half	spuCh17_vol-L
+.half	spuCh17_vol-R
+.half	spuCh17_pitch	; $1000=44.1Khz
+.half	spuCh17_waveAddr
+.half	spuCh17_atack,dekey,susLev
+.half	spuCh17_susRate,relRate
+.half	spuCh17_ADSR-Vol
+.half	spuCh17_LoopPoint
+1f801d20:
+.half	spuCh18_vol-L
+.half	spuCh18_vol-R
+.half	spuCh18_pitch	; $1000=44.1Khz
+.half	spuCh18_waveAddr
+.half	spuCh18_atack,dekey,susLev
+.half	spuCh18_susRate,relRate
+.half	spuCh18_ADSR-Vol
+.half	spuCh18_LoopPoint
+1f801d30:
+.half	spuCh19_vol-L
+.half	spuCh19_vol-R
+.half	spuCh19_pitch	; $1000=44.1Khz
+.half	spuCh19_waveAddr
+.half	spuCh19_atack,dekey,susLev
+.half	spuCh19_susRate,relRate
+.half	spuCh19_ADSR-Vol
+.half	spuCh19_LoopPoint
+1f801d40:
+.half	spuCh20_vol-L
+.half	spuCh20_vol-R
+.half	spuCh20_pitch	; $1000=44.1Khz
+.half	spuCh20_waveAddr
+.half	spuCh20_atack,dekey,susLev
+.half	spuCh20_susRate,relRate
+.half	spuCh20_ADSR-Vol
+.half	spuCh20_LoopPoint
+1f801d50:
+.half	spuCh21_vol-L
+.half	spuCh21_vol-R
+.half	spuCh21_pitch	; $1000=44.1Khz
+.half	spuCh21_waveAddr
+.half	spuCh21_atack,dekey,susLev
+.half	spuCh21_susRate,relRate
+.half	spuCh21_ADSR-Vol
+.half	spuCh21_LoopPoint
+1f801d60:
+.half	spuCh22_vol-L
+.half	spuCh22_vol-R
+.half	spuCh22_pitch	; $1000=44.1Khz
+.half	spuCh22_waveAddr
+.half	spuCh22_atack,dekey,susLev
+.half	spuCh22_susRate,relRate
+.half	spuCh22_ADSR-Vol
+.half	spuCh22_LoopPoint
+1f801d70:
+.half	spuCh23_vol-L
+.half	spuCh23_vol-R
+.half	spuCh23_pitch	; $1000=44.1Khz
+.half	spuCh23_waveAddr
+.half	spuCh23_atack,dekey,susLev
+.half	spuCh23_susRate,relRate
+.half	spuCh23_ADSR-Vol
+.half	spuCh23_LoopPoint
+
+1f801d80:
+.half	spu_MasterVolL
+.half	spu_MasterVolR
+.half	spu_RevDepthL
+.half	spu_RevDepthR
+
+.half	spu_VoiceOn_LO
+.half	spu_VoiceOn_HI
+.half	spu_VoiceOff_LO
+.half	spu_VoiceOff_HI
+1f801d90:
+.half	spu_LFO_LO
+.half	spu_LFO_HI
+.half	spu_Noise_LO
+.half	spu_Noise_HI
+.half	spu_Reverb_LO
+.half	spu_Reverb_HI
+.half	spu_VoiceSts_LO
+.half	spu_VoiceSts_HI
+1f801da0:
+.half	spu_?
+.half	spu_ReverbOffset
+.half	spu_IRQaddr
+.half	spu_AddrRegister
+.half	spu_DataRegister
+.half	spu_cntl1
+.half	spu_cntl2
+.half	spu_sts
+1f801dc0:
+.half	spu_reverb_reg? ; Unknown after this...
+
+
+1f802030:
+.word	int_2000
+1f802040:
+.word	dip switch
+

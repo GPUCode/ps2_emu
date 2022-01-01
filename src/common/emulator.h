@@ -23,6 +23,11 @@ namespace gs
     struct GraphicsSynthesizer;
 }
 
+namespace vu
+{
+    struct VU0;
+}
+
 namespace common
 {
     constexpr uint32_t KUSEG_MASKS[8] = 
@@ -75,6 +80,7 @@ namespace common
         std::unique_ptr<gs::GIF> gif;
         std::unique_ptr<gs::GraphicsSynthesizer> gs;
         std::unique_ptr<ee::DMAController> dmac;
+        std::unique_ptr<vu::VU0> vu0;
 
         /* Memory - Registers */
         uint8_t* bios;
@@ -127,7 +133,7 @@ namespace common
             return (*handler)(paddr, data);
         }
         
-        if constexpr (std::is_same<T, unsigned __int128>::value)
+        if constexpr (std::is_same<T, uint128_t>::value)
         {
             uint64_t upper = (data >> 64);
             fmt::print("[{}] {:d}bit write {:#x}{:016x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, upper, (uint64_t)data, paddr);

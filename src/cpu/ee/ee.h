@@ -86,10 +86,8 @@ namespace ee
     };
 
     /* A class implemeting the MIPS R5900 CPU. */
-    class EmotionEngine
+    struct EmotionEngine
     {
-        friend class INTC;
-    public:
         EmotionEngine(common::Emulator* parent);
         ~EmotionEngine();
 
@@ -128,11 +126,11 @@ namespace ee
         void op_dsllv(); void op_daddiu(); void op_sq(); void op_lh();
         void op_cache(); void op_sllv(); void op_srav(); void op_nor();
 
+        /* COP2 instructions */
+        void op_cop2();
+
         /* Parallel instructions */
         void op_por();
-
-    protected:
-        common::Emulator* emulator;
 
         /* Registers. */
         Register gpr[32] = {};
@@ -161,6 +159,9 @@ namespace ee
         /* Interrupts/Timers */
         INTC intc;
         Timers timers;
+
+    protected:
+        common::Emulator* emulator;
 
         /* Logging */
         std::FILE* disassembly;
