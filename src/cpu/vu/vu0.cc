@@ -20,7 +20,7 @@ namespace vu
 		case 0b101100:
 			return op_vsub(vu_instr);
 		case 0b110000:
-
+			return op_viadd(vu_instr);
 		case 0b111100 ... 0b111111:
 			return special2(instr);
 		default:
@@ -37,6 +37,10 @@ namespace vu
 		VUInstr vu_instr = { .value = instr.value };
 		switch (opcode)
 		{
+		case 0b0000100: op_vsuba(vu_instr); break;
+		case 0b0001000: op_vmadda(vu_instr); break;
+		case 0b0001100: op_vmsuba(vu_instr); break;
+		case 0b0010000: op_vitof0(vu_instr); break;
 		case 0b0111111: op_viswr(vu_instr); break;
 		case 0b0110101: op_vsqi(vu_instr); break;
 		default:
@@ -156,5 +160,64 @@ namespace vu
 
 		fmt::print("[VU0] VIADD VI[{}] = VI[{}] ({:#x}) + VI[{}] ({:#x})\n", id, is, regs.vi[is], it, regs.vi[it]);
 		regs.vi[id] = regs.vi[is] + regs.vi[it];
+	}
+
+	void VU0::op_vsuba(VUInstr instr)
+	{
+		uint16_t fs = instr.fs;
+		uint16_t ft = instr.ft;
+
+		fmt::print("[VU0] VSUBA Writing VF[{}] - VF[{}] (", fs, ft);
+		for (int i = 0; i < 4; i++)
+		{
+			/* If the component is set in the dest mask */
+			if (instr.dest & (1 << i))
+			{
+				fmt::print("{}, ", "XYZW"[i]);
+				acc.fword[i] = regs.vf[fs].fword[i] - regs.vf[ft].fword[i];
+			}
+		}
+		fmt::print("\b\b)\n");
+	}
+	
+	void VU0::op_vmadda(VUInstr instr)
+	{
+		uint16_t fs = instr.fs;
+		uint16_t ft = instr.ft;
+
+		fmt::print("[VU0] VMADDA Writing VF[{}] * VF[{}] (", fs, ft);
+		for (int i = 0; i < 4; i++)
+		{
+			/* If the component is set in the dest mask */
+			if (instr.dest & (1 << i))
+			{
+				fmt::print("{}, ", "XYZW"[i]);
+				acc.fword[i] += regs.vf[fs].fword[i] * regs.vf[ft].fword[i];
+			}
+		}
+		fmt::print("\b\b)\n");
+	}
+	
+	void VU0::op_vmsuba(VUInstr instr)
+	{
+		uint16_t fs = instr.fs;
+		uint16_t ft = instr.ft;
+
+		fmt::print("[VU0] VMSUBA Writing VF[{}] - VF[{}] (", fs, ft);
+		for (int i = 0; i < 4; i++)
+		{
+			/* If the component is set in the dest mask */
+			if (instr.dest & (1 << i))
+			{
+				fmt::print("{}, ", "XYZW"[i]);
+				acc.fword[i] -= regs.vf[fs].fword[i] * regs.vf[ft].fword[i];
+			}
+		}
+		fmt::print("\b\b)\n");
+	}
+
+	void VU0::op_vitof0(VUInstr instr)
+	{
+
 	}
 }

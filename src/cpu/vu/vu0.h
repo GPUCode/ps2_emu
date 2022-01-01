@@ -11,10 +11,13 @@ using uint128_t = unsigned __int128;
 
 namespace vu
 {
-	union VF
+	union Vector
 	{
+		/* The unsigned part is used to preserve bit data */
 		uint128_t qword;
 		uint32_t word[4];
+		/* Float part is used for float operations */
+		float fword[4];
 		struct { float x, y, z, w; };
 	};
 
@@ -22,7 +25,7 @@ namespace vu
 	{
 		uint32_t vi[16];
 		uint32_t control[16];
-		VF vf[32];
+		Vector vf[32];
 	};
 
 	union VUInstr
@@ -47,12 +50,6 @@ namespace vu
 			uint32_t ft : 5;
 			uint32_t : 11;
 		};
-
-		VUInstr operator=(uint32_t i)
-		{
-			VUInstr v = { .value = i };
-			return v;
-		}
 	};
 
 	struct VU0
@@ -73,10 +70,15 @@ namespace vu
 		void op_vsub(VUInstr instr);
 		void op_vsqi(VUInstr instr);
 		void op_viadd(VUInstr instr);
+		void op_vsuba(VUInstr instr);
+		void op_vmadda(VUInstr instr);
+		void op_vmsuba(VUInstr instr);
+		void op_vitof0(VUInstr instr);
 
 	private:
 		ee::EmotionEngine* cpu;
 		Registers regs = {};
+		Vector acc;
 
 		uint8_t data[4 * 1024] = {};
 	};
