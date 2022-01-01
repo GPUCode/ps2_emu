@@ -173,6 +173,8 @@ namespace iop
         {
         case 0 ... 0x1fffff:
             return *(T*)&ram[paddr];
+        case 0x1f402005:
+            return 0x40; /* Report to CDVDMAN, the DVD drive is ready */
         case 0x1f801100 ... 0x1f80112c:
         case 0x1f801480 ... 0x1f8014ac:
             return timers.read(paddr);
