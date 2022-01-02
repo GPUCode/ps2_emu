@@ -59,6 +59,7 @@ namespace ee
         uint128_t qword;
         uint64_t dword[2];
         uint32_t word[4];
+        uint8_t byte[16];
     };
 
     constexpr uint8_t SPECIAL_OPCODE = 0b000000;
@@ -126,6 +127,8 @@ namespace ee
         void op_dsrav(); void op_xori(); void op_mult1(); void op_movz();
         void op_dsllv(); void op_daddiu(); void op_sq(); void op_lh();
         void op_cache(); void op_sllv(); void op_srav(); void op_nor();
+        void op_lwu(); void op_ldl(); void op_ldr(); void op_sdl();
+        void op_sdr(); void op_dsrl(); void op_srlv(); void op_dsrl32();
 
         /* COP1 instructions */
         void op_cop1(); void op_mtc1(); void op_ctc1();

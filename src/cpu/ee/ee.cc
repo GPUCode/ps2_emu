@@ -108,6 +108,11 @@ namespace ee
         case 0b011111: op_sq(); break;
         case 0b100001: op_lh(); break;
         case 0b101111: op_cache(); break;
+        case 0b100111: op_lwu(); break;
+        case 0b011010: op_ldl(); break;
+        case 0b011011: op_ldr(); break;
+        case 0b101100: op_sdl(); break;
+        case 0b101101: op_sdr(); break;
         default:
             fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
             std::abort();
@@ -250,6 +255,9 @@ namespace ee
         case 0b000100: op_sllv(); break;
         case 0b000111: op_srav(); break;
         case 0b100111: op_nor(); break;
+        case 0b111010: op_dsrl(); break;
+        case 0b000110: op_srlv(); break;
+        case 0b111110: op_dsrl32(); break;
         default:
             fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		    std::abort();
@@ -815,7 +823,7 @@ namespace ee
 
         int32_t reg = (int32_t)gpr[rt].word[0];
         uint16_t sa = gpr[rs].word[0] & 0x3F;
-        gpr[rd].word[0] = reg >> sa;
+        gpr[rd].dword[0] = reg >> sa;
 
         log("SRAV: GPR[{:d}] = GPR[{:d}] ({:#x}) >> GPR[{:d}] ({:d})\n", rd, rt, reg, rs, sa);
     }
@@ -829,6 +837,144 @@ namespace ee
         gpr[rd].dword[0] = ~(gpr[rs].dword[0] | gpr[rt].dword[0]);
         
         log("NOR: GPR[{:d}] = GPR[{:d}] ({:#x}) NOR GPR[{:d}] ({:d})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    }
+
+    void EmotionEngine::op_lwu()
+    {
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        uint32_t vaddr = offset + gpr[base].word[0];
+
+        log("LWU: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+        if (vaddr & 0x3) [[unlikely]]
+        {
+            log("[ERROR] LWU: Address {:#x} is not aligned\n", vaddr);
+            exception(Exception::AddrErrorLoad);
+        }
+        else
+            gpr[rt].dword[0] = read<uint32_t>(vaddr);
+    }
+
+    void EmotionEngine::op_ldl()
+    {
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        /* The address given is unaligned, so let's align it first */
+        uint32_t addr = offset + gpr[base].word[0];
+        uint32_t aligned_addr = addr & ~0x7;
+        auto qword = read<uint64_t>(aligned_addr);
+
+        /* How many bytes to transfer? */
+        uint16_t bcount = addr & 0x7;
+        for (int i = bcount; i >= 0; i--)
+        {
+            gpr[rt].byte[bcount - i] = *((uint8_t*)&qword + i);
+        }
+
+        log("LDL: GPR[{}] = {:#x} with data from {:#x}\n", gpr[rt].dword[0], addr);
+    }
+
+    void EmotionEngine::op_ldr()
+    {
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        /* The address given is unaligned, so let's align it first */
+        uint32_t addr = offset + gpr[base].word[0];
+        uint32_t aligned_addr = addr & ~0x7;
+        auto qword = read<uint64_t>(aligned_addr);
+
+        /* How many bytes to transfer? */
+        uint16_t bcount = addr & 0x7;
+        for (int i = bcount; i < 8; i++)
+        {
+            gpr[rt].byte[7 - (i - bcount)] = *((uint8_t*)&qword + i);
+        }
+
+        log("LDR: GPR[{}] = {:#x} with data from {:#x}\n", gpr[rt].dword[0], addr);
+    }
+
+    void EmotionEngine::op_sdl()
+    {
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        /* The address given is unaligned, so let's align it first */
+        uint32_t addr = offset + gpr[base].word[0];
+        uint32_t aligned_addr = addr & ~0x7;
+        auto qword = read<uint64_t>(aligned_addr);
+
+        /* How many bytes to transfer? */
+        uint16_t bcount = addr & 0x7;
+        for (int i = bcount; i >= 0; i--)
+        {
+            *((uint8_t*)&qword + i) = gpr[rt].byte[bcount - i];
+        }
+
+        write<uint64_t>(aligned_addr, qword);
+        log("SDL: Writing {:#x} to address {:#x}\n", qword, aligned_addr);
+    }
+
+    void EmotionEngine::op_sdr()
+    {
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        /* The address given is unaligned, so let's align it first */
+        uint32_t addr = offset + gpr[base].word[0];
+        uint32_t aligned_addr = addr & ~0x7;
+        auto qword = read<uint64_t>(aligned_addr);
+
+        /* How many bytes to transfer? */
+        uint16_t bcount = addr & 0x7;
+        for (int i = bcount; i < 8; i++)
+        {
+            *((uint8_t*)&qword + i) = gpr[rt].byte[7 - (i - bcount)];
+        }
+
+        write<uint64_t>(aligned_addr, qword);
+        log("SDR: Writing {:#x} to address {:#x}\n", qword, addr);
+    }
+
+    void EmotionEngine::op_dsrl()
+    {
+        uint16_t sa = instr.r_type.sa;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        gpr[rd].dword[0] = gpr[rt].dword[0] >> sa;
+
+        log("DSRL: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].dword[0], sa);
+    }
+
+    void EmotionEngine::op_srlv()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        uint16_t sa = gpr[rs].word[0] & 0x3F;
+        gpr[rd].dword[0] = (int32_t)(gpr[rt].word[0] >> sa);
+
+        log("SRLV: GPR[{:d}] = GPR[{:d}] ({:#x}) >> GPR[{:d}] ({:d})\n", rd, rt, gpr[rt].word[0], rs, sa);
+    }
+
+    void EmotionEngine::op_dsrl32()
+    {
+        uint16_t sa = instr.r_type.sa;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        gpr[rd].dword[0] = gpr[rt].dword[0] >> (sa + 32);
+
+        log("DSRL32: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].dword[0], sa);
     }
 
     void EmotionEngine::op_cop1()
