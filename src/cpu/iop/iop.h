@@ -163,6 +163,7 @@ namespace iop
         Instruction instr, next_instr;
 
         FILE* disassembly;
+        std::ofstream console;
     };
 
     template<typename T>

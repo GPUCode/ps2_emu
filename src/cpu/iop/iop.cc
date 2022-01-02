@@ -19,6 +19,7 @@ namespace iop
 
         /* Open output log */
         disassembly = std::fopen("disassembly_iop.log", "w");
+        console.open("console_iop.txt", std::ios::out);
 
         /* Allocate the 3MB of IOP memory */
         ram = new uint8_t[2 * 1024 * 1024]{};
@@ -148,6 +149,21 @@ namespace iop
     {
         /* Fetch instruction from main RAM. */
         instr = next_instr;
+
+        /* Detect calls to the putc function and handle them */
+        if (instr.pc == 0x00012C48 || instr.pc == 0x0001420C || instr.pc == 0x0001430C)
+        {
+            uint32_t pointer = gpr[5];
+            uint32_t text_size = gpr[6];
+            while (text_size)
+            {
+                auto c = (char)ram[pointer & 0x1FFFFF];
+                emulator->print(c);
+                
+                pointer++;
+                text_size--;
+            }
+        }
 
         /* Check aligment errors. */
         if (pc & 0x3) [[unlikely]]

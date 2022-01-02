@@ -17,7 +17,6 @@ namespace ee
     {
         /* Open output log */
         disassembly = std::fopen("disassembly_ee.log", "w");
-        console.open("console.txt", std::ios::out);
 
         /* Allocate the 32MB of EE memory */
         ram = new uint8_t[32 * 1024 * 1024]{};
@@ -74,6 +73,7 @@ namespace ee
         {
         case COP0_OPCODE: op_cop0(); break;
         case SPECIAL_OPCODE: op_special(); break;
+        case COP1_OPCODE: op_cop1(); break;
         case 0b010010: op_cop2(); break;
         case 0b101011: op_sw(); break;
         case 0b001010: op_slti(); break;
@@ -405,7 +405,7 @@ namespace ee
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = offset + gpr[base].word[0];
-        uint32_t data = fpr[ft].word[0];
+        uint32_t data = cop1.fpr[ft].uint;
 
         log("SWC1: Writing FPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", ft, data, vaddr, base, gpr[base].word[0], offset);
         if ((vaddr & 0b11) != 0) [[unlikely]]
@@ -829,6 +829,45 @@ namespace ee
         gpr[rd].dword[0] = ~(gpr[rs].dword[0] | gpr[rt].dword[0]);
         
         log("NOR: GPR[{:d}] = GPR[{:d}] ({:#x}) NOR GPR[{:d}] ({:d})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    }
+
+    void EmotionEngine::op_cop1()
+    {
+        uint32_t fmt = (instr.value >> 21) & 0x1f;
+        switch (fmt)
+        {
+        case 0b00100:
+            op_mtc1(); break;
+        case 0b00110:
+            op_ctc1(); break;
+        case 0b10000:
+            cop1.execute(instr); break;
+        default:
+            fmt::print("[ERROR] Unimplemented COP1 instruction {:#07b}\n", fmt);
+            std::abort();
+        }
+    }
+
+    void EmotionEngine::op_mtc1()
+    {
+        uint16_t fs = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        log("MTC1: FPR[{}] = GPR[{}] ({:#x})\n", fs, rt, gpr[rt].word[0]);
+        cop1.fpr[fs].uint = gpr[rt].word[0];
+    }
+
+    void EmotionEngine::op_ctc1()
+    {
+        uint16_t fs = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        fmt::print("[COP1] CTC1: FCR{} = GPR[{}] = ({:#x})\n", fs, rt, gpr[rt].word[0]);
+        switch (fs)
+        {
+        case 0: cop1.fcr0.value = gpr[rt].word[0]; break;
+        case 31: cop1.fcr31.value = gpr[rt].word[0]; break;
+        }
     }
 
     void EmotionEngine::op_cop2()

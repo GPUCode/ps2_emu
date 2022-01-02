@@ -32,6 +32,9 @@ namespace common
         vu0 = std::make_unique<vu::VU0>(ee.get());
         vif = std::make_unique<vu::VIF>(this);
         ipu = std::make_unique<media::IPU>(this);
+
+        /* Initialize console */
+        console.open("console.txt", std::ios::out);
     }
 
     Emulator::~Emulator()
@@ -45,6 +48,12 @@ namespace common
         
         /* Cleanup BIOS memory */
         delete[] bios;
+    }
+
+    void Emulator::print(char c)
+    {
+        console << c;
+        console.flush();
     }
 
     const uint32_t Emulator::calculate_page(const uint32_t addr)

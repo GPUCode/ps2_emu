@@ -1,6 +1,7 @@
 #pragma once
 #include <common/emulator.h>
 #include <cpu/ee/cop0.h>
+#include <cpu/ee/cop1.h>
 #include <cpu/ee/intc.h>
 #include <cpu/ee/timers.h>
 
@@ -126,6 +127,9 @@ namespace ee
         void op_dsllv(); void op_daddiu(); void op_sq(); void op_lh();
         void op_cache(); void op_sllv(); void op_srav(); void op_nor();
 
+        /* COP1 instructions */
+        void op_cop1(); void op_mtc1(); void op_ctc1();
+
         /* COP2 instructions */
         void op_cop2();
 
@@ -141,10 +145,6 @@ namespace ee
         uint32_t exception_addr[2] = { 0x80000000, 0xBFC00200 };
         bool skip_branch_delay = false;
 
-        /* FPU (COP1) registers */
-        Register fpr[32];
-        uint64_t fcr0, fcr31;
-
         /* EE memory */
         uint8_t scratchpad[16 * 1024];
         uint8_t* ram = nullptr;
@@ -155,6 +155,7 @@ namespace ee
 
         /* Coprocessors */
         COP0 cop0 = {};
+        COP1 cop1 = {};
 
         /* Interrupts/Timers */
         INTC intc;
@@ -165,7 +166,6 @@ namespace ee
 
         /* Logging */
         std::FILE* disassembly;
-        std::ofstream console;
     };
 
     template <typename T>
@@ -228,11 +228,8 @@ namespace ee
             intc.write(paddr, data);
             break;
         case 0x1000f180: /* Record any console output */
-        {
-            console << (char)data;
-            console.flush();
+            emulator->print(data);
             break;
-        }
         case 0x1000f430:
         {
             uint8_t SA = (data >> 16) & 0xFFF;

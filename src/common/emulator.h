@@ -71,6 +71,10 @@ namespace common
         template <typename T, ComponentID id>
         void write(uint32_t addr, T data);
 
+        /* Prints a character to our console */
+        void print(char c);
+
+        /* Handler interface */
         template <typename T = uint32_t, typename R, typename W>
         void add_handler(uint32_t address, Component* c, R reader, W writer);
 
@@ -103,6 +107,7 @@ namespace common
         /* Utilities */
         const char* component_name[2] = { "EE", "IOP" };
         std::atomic_bool stop_thread = false;
+        std::ofstream console;
     };
 
     /* Instanciate the templates here so we can limit their types below */
