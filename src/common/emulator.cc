@@ -6,6 +6,7 @@
 #include <cpu/vu/vif.h>
 #include <gs/gif.h>
 #include <gs/gs.h>
+#include <media/ipu.h>
 #include <cassert>
 
 int cycles_executed = 0;
@@ -30,6 +31,7 @@ namespace common
         dmac = std::make_unique<ee::DMAController>(this);
         vu0 = std::make_unique<vu::VU0>(ee.get());
         vif = std::make_unique<vu::VIF>(this);
+        ipu = std::make_unique<media::IPU>(this);
     }
 
     Emulator::~Emulator()

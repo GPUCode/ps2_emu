@@ -30,6 +30,11 @@ namespace vu
     struct VIF;
 }
 
+namespace media
+{
+    struct IPU;
+}
+
 namespace common
 {
     constexpr uint32_t KUSEG_MASKS[8] = 
@@ -84,6 +89,7 @@ namespace common
         std::unique_ptr<ee::DMAController> dmac;
         std::unique_ptr<vu::VU0> vu0;
         std::unique_ptr<vu::VIF> vif;
+        std::unique_ptr<media::IPU> ipu;
 
         /* Memory - Registers */
         uint8_t* bios;
