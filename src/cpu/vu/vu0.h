@@ -57,6 +57,13 @@ namespace vu
 		VU0(ee::EmotionEngine* parent);
 		~VU0() = default;
 
+		/* Read/Write VU memory */
+		template <typename T>
+		T read(uint32_t addr);
+
+		template <typename T>
+		void write(uint32_t addr, T value);
+
 		/* There are executed directly from the EE
 		   when VU0 is in macro mode */
 		void special1(ee::Instruction instr);
@@ -80,6 +87,34 @@ namespace vu
 		Registers regs = {};
 		Vector acc;
 
+		/* VU0 memory */
 		uint8_t data[4 * 1024] = {};
+		uint8_t code[4 * 1024] = {};
 	};
+	
+	template<typename T>
+	inline T VU0::read(uint32_t addr)
+	{
+		if (addr < 0x11004000)
+		{
+			return *(T*)&code[addr & 0x1000];
+		}
+		else
+		{
+			return *(T*)&data[addr & 0x1000];
+		}
+	}
+	
+	template<typename T>
+	inline void VU0::write(uint32_t addr, T value)
+	{
+		if (addr < 0x11004000)
+		{
+			*(T*)&code[addr & 0x1000] = value;
+		}
+		else
+		{
+			*(T*)&data[addr & 0x1000] = value;
+		}
+	}
 }

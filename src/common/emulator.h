@@ -1,6 +1,7 @@
 #pragma once
 #include <common/component.h>
 #include <cpu/iop/dma.h>
+#include <cpu/vu/vu0.h>
 #include <fmt/format.h>
 #include <memory>
 #include <fstream>
@@ -26,6 +27,7 @@ namespace gs
 namespace vu
 {
     struct VU0;
+    struct VIF;
 }
 
 namespace common
@@ -81,6 +83,7 @@ namespace common
         std::unique_ptr<gs::GraphicsSynthesizer> gs;
         std::unique_ptr<ee::DMAController> dmac;
         std::unique_ptr<vu::VU0> vu0;
+        std::unique_ptr<vu::VIF> vif;
 
         /* Memory - Registers */
         uint8_t* bios;
@@ -125,22 +128,29 @@ namespace common
     template <typename T, ComponentID id>
     inline void Emulator::write(uint32_t paddr, T data)
     {
-        auto page = Emulator::calculate_page(paddr);
-        auto handler = (Handler<T>*)handlers[page];
-
-        if (handler)
+        if (paddr >= 0x11000000 && paddr < 0x11008000)
         {
-            return (*handler)(paddr, data);
-        }
-        
-        if constexpr (std::is_same<T, uint128_t>::value)
-        {
-            uint64_t upper = (data >> 64);
-            fmt::print("[{}] {:d}bit write {:#x}{:016x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, upper, (uint64_t)data, paddr);
+            vu0->write(paddr, data);
         }
         else
         {
-            fmt::print("[{}] {:d}bit write {:#x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, data, paddr);
+            auto page = Emulator::calculate_page(paddr);
+            auto handler = (Handler<T>*)handlers[page];
+
+            if (handler)
+            {
+                return (*handler)(paddr, data);
+            }
+
+            if constexpr (std::is_same<T, uint128_t>::value)
+            {
+                uint64_t upper = (data >> 64);
+                fmt::print("[{}] {:d}bit write {:#x}{:016x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, upper, (uint64_t)data, paddr);
+            }
+            else
+            {
+                fmt::print("[{}] {:d}bit write {:#x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, data, paddr);
+            }
         }
     }
     

@@ -24,6 +24,7 @@ add_executable(${PROJECT_NAME}
 	"src/gs/gs.cc"
 	"src/cpu/ee/dmac.cc"
 	"src/cpu/vu/vu0.cc"
+	"src/cpu/vu/vif.cc"
 )
 
 # Link to all the required conan libs

@@ -40,7 +40,6 @@ namespace vu
 		case 0b0000100: op_vsuba(vu_instr); break;
 		case 0b0001000: op_vmadda(vu_instr); break;
 		case 0b0001100: op_vmsuba(vu_instr); break;
-		case 0b0010000: op_vitof0(vu_instr); break;
 		case 0b0111111: op_viswr(vu_instr); break;
 		case 0b0110101: op_vsqi(vu_instr); break;
 		default:
@@ -218,6 +217,19 @@ namespace vu
 
 	void VU0::op_vitof0(VUInstr instr)
 	{
+		uint16_t fs = instr.fs;
+		uint16_t ft = instr.ft;
 
+		fmt::print("[VU0] VITOF0 VF[{}] = to_float(VF[{}]) (\n", ft, fs);
+		for (int i = 0; i < 4; i++)
+		{
+			/* If the component is set in the dest mask */
+			if (instr.dest & (1 << i))
+			{
+				fmt::print("{}, ", "XYZW"[i]);
+				regs.vf[ft].fword[i] = (float)regs.vf[fs].word[i];
+			}
+		}
+		fmt::print("\b\b)\n");
 	}
 }

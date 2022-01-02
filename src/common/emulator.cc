@@ -3,6 +3,7 @@
 #include <cpu/ee/dmac.h>
 #include <cpu/iop/iop.h>
 #include <cpu/vu/vu0.h>
+#include <cpu/vu/vif.h>
 #include <gs/gif.h>
 #include <gs/gs.h>
 #include <cassert>
@@ -28,6 +29,7 @@ namespace common
         gs = std::make_unique<gs::GraphicsSynthesizer>(this);
         dmac = std::make_unique<ee::DMAController>(this);
         vu0 = std::make_unique<vu::VU0>(ee.get());
+        vif = std::make_unique<vu::VIF>(this);
     }
 
     Emulator::~Emulator()
