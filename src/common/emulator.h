@@ -56,6 +56,7 @@ namespace common
     };
 
     /* This class act as the "motherboard" of sorts */
+    class SIF;
     class Emulator
     {
     public:
@@ -94,6 +95,7 @@ namespace common
         std::unique_ptr<vu::VU0> vu0;
         std::unique_ptr<vu::VIF> vif;
         std::unique_ptr<media::IPU> ipu;
+        std::unique_ptr<common::SIF> sif;
 
         /* Memory - Registers */
         uint8_t* bios;

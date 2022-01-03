@@ -1,4 +1,5 @@
 #include <common/emulator.h>
+#include <common/sif.h>
 #include <cpu/ee/ee.h>
 #include <cpu/ee/dmac.h>
 #include <cpu/iop/iop.h>
@@ -32,6 +33,7 @@ namespace common
         vu0 = std::make_unique<vu::VU0>(ee.get());
         vif = std::make_unique<vu::VIF>(this);
         ipu = std::make_unique<media::IPU>(this);
+        sif = std::make_unique<common::SIF>(this);
 
         /* Initialize console */
         console.open("console.txt", std::ios::out);
