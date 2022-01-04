@@ -40,6 +40,37 @@ namespace common
 
 		fmt::print("[SIF][{}] Writing {:#x} to {}\n", COMP[comp], data, REGS[offset]);
 
-		*ptr = data;
+		/* Writing to SIF_CTRL is special and
+		   a bit mysterious as not much is known
+		   about this register */
+		if (offset == 4)
+		{
+			auto& control = regs.ctrl;
+			if (comp == 0) /* Writes from IOP */
+			{
+				uint8_t temp = data & 0xF0;
+				if (data & 0xA0)
+				{
+					control &= ~0xF000;
+					control |= 0x2000;
+				}
+
+				if (control & temp)
+					control &= ~temp;
+				else
+					control |= temp;
+			}
+			else /* Writes from the EE */
+			{
+				if (!(data & 0x100))
+					control &= ~0x100;
+				else
+					control |= 0x100;
+			}
+		}
+		else
+		{
+			*ptr = data;
+		}
 	}
 }
