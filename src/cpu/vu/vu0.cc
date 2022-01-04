@@ -94,9 +94,14 @@ namespace vu
 
 		/* VI[is] contains the address divided by 16 */
 		uint32_t address = regs.vi[is] * 16;
+		fmt::print("[VU0] VISWR Writing VI[{}] = {:#x} to address {:#x} (", it, regs.vi[it], address);
+
+		/* HACK */
+		if (address > 0xff0)
+			return;
+
 		auto ptr = (uint32_t*)&data[address];
 
-		fmt::print("[VU0] VISWR Writing VI[{}] = {:#x} to address {:#x} (", it, regs.vi[it], address);
 		for (int i = 0; i < 4; i++)
 		{
 			/* If the component is set in the dest mask */
