@@ -873,7 +873,7 @@ namespace ee
             gpr[rt].byte[bcount - i] = *((uint8_t*)&qword + i);
         }
 
-        log("LDL: GPR[{}] = {:#x} with data from {:#x}\n", gpr[rt].dword[0], addr);
+        log("LDL: GPR[{}] = {:#x} with data from {:#x}\n", rt, gpr[rt].dword[0], addr);
     }
 
     void EmotionEngine::op_ldr()
@@ -894,7 +894,7 @@ namespace ee
             gpr[rt].byte[7 - (i - bcount)] = *((uint8_t*)&qword + i);
         }
 
-        log("LDR: GPR[{}] = {:#x} with data from {:#x}\n", gpr[rt].dword[0], addr);
+        log("LDR: GPR[{}] = {:#x} with data from {:#x}\n", rt, gpr[rt].dword[0], addr);
     }
 
     void EmotionEngine::op_sdl()
@@ -1213,7 +1213,7 @@ namespace ee
         hi1 = (int64_t)(int32_t)(result >> 32);
         gpr[rd].dword[0] = (int64_t)lo1;
 
-        //log("MADD1: GPR[{:d}] = LO1 = {:#x} and HI1 = {:#x}\n", lo1, hi1);
+        log("MADD1: GPR[{:d}] = LO1 = {:#x} and HI1 = {:#x}\n", rd, lo1, hi1);
     }
 
     void EmotionEngine::op_jalr()

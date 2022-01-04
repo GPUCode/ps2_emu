@@ -3,6 +3,18 @@
 #include <fmt/color.h>
 #include <cassert>
 
+constexpr const char* REGS[] =
+{
+	"Dn_MADR", "Dn_BCR",
+	"Dn_CHCR", "Dn_TADR"
+};
+
+constexpr const char* GLOBALS[] =
+{
+	"DPCR", "DICR", "DPCR2",
+	"DICR2", "DMACEN", "DMACINTEN"
+};
+
 namespace iop
 {
 	/* DMA Controller class implementation. */
@@ -18,95 +30,62 @@ namespace iop
 	{
 	}
 
-	void DMAController::transfer_finished(DMAChannels dma_channel)
+	void DMAController::start(uint32_t channel)
 	{
-	}
 
-	void DMAController::start(DMAChannels dma_channel)
-	{
-		DMAChannel& channel = channels[dma_channel];
-
-		/* Start linked list copy routine. */
-		switch (channel.channel_ctrl.transfer_mode)
-		{
-		case TransferMode::Linked_List:	
-			list_copy(dma_channel); break;
-		default:
-			block_copy(dma_channel);
-		}
-
-		/* Complete the transfer. */
-		transfer_finished(dma_channel);
-	}
-
-	void DMAController::block_copy(DMAChannels dma_channel)
-	{
-	}
-
-	void DMAController::list_copy(DMAChannels dma_channel)
-	{
 	}
 
 	uint32_t DMAController::read(uint32_t address)
 	{
-		assert(address >= 0x1F801080 && address <= 0x1F8010F4 || address >= 0x1F801500 && address <= 0x1F80157C);
+		uint16_t group = (address >> 8) & 0x1;
 
-		/* Get channel information from address. */
-		bool group = address & 0x100;
-		uint16_t channel_num = (address & 0x70) >> 4;
-		uint16_t offset = (address & 0xf) >> 2;
-		
-		uint32_t* ptr = nullptr;
-		if (channel_num >= 0 && channel_num <= 6) 
+		/* Read globals */
+		if ((address & 0x70) == 0x70)
 		{
-			ptr = (uint32_t*)&channels[channel_num + group * 7] + offset;
+			uint16_t offset = ((address & 0xf) >> 2) + 2 * group;
+			auto ptr = (uint32_t*)&globals + offset;
+			fmt::print("[IOP DMA] Reading {:#x} from global register {}\n", *ptr, GLOBALS[offset]);
+			return *ptr;
 		}
-		else if (channel_num == 7) 
+		else /* Read from channel */
 		{
-			ptr = (uint32_t*)&globals + 2 * offset + group;
+			uint16_t channel = ((address & 0x70) >> 4) + group * 7;
+			uint16_t offset = (address & 0xf) >> 2;
+			auto ptr = (uint32_t*)&channels[channel] + offset;
+			fmt::print("[IOP DMA] Reading {:#x} from {} in channel {:d}\n", *ptr, REGS[offset], channel);
+			return *ptr;
 		}
-		else
-		{
-			fmt::print("[IOP DMA] Invalid channel number {:d}\n", channel_num);
-			std::abort();
-		}
-
-		fmt::print("[IOP DMA] Reading {:#x} from DMA channel {:d} at address {:#x}\n", *ptr, channel_num, address);
-		return *ptr;
 	}
 
 	void DMAController::write(uint32_t address, uint32_t data)
 	{
-		assert(address >= 0x1F801080 && address <= 0x1F8010F4 || address >= 0x1F801500 && address <= 0x1F80157C);
-
 		/* Get channel information from address. */
-		bool group = address & 0x100;
-		uint16_t channel_num = (address & 0x70) >> 4;
-		uint16_t offset = (address & 0xf) >> 2;
+		uint16_t group = (address >> 8) & 0x1;
 
-		fmt::print("[IOP DMA] Writing {:#x} to DMA channel {:d} at address {:#x}\n", data, channel_num, address);
+		/* Write globals */
+		if ((address & 0x70) == 0x70)
+		{
+			uint16_t offset = ((address & 0xf) >> 2) + 2 * group;
+			auto ptr = (uint32_t*)&globals + offset;
+			fmt::print("[IOP DMA] Writing {:#x} to {}\n", data, GLOBALS[offset]);
 
-		if (channel_num >= 0 && channel_num <= 6) 
-		{
-			auto ptr = (uint32_t*)&channels[channel_num + group * 7] + offset;
-			*ptr = data;
-		}
-		else if (channel_num == 7) 
-		{
-			auto ptr = (uint32_t*)&globals + 2 * offset + group;
 			*ptr = data;
 
-			if (offset == 4 && !group)
+			/* Handle special case for writing to DICR */
+			if (offset == 1)
 			{
-				/* Handle special case for writing to DICR */
 				auto& irq = globals.dicr;
 				irq.master_flag = irq.force || (irq.master_enable && ((irq.enable & irq.flags) > 0));
 			}
 		}
-		else
+		else /* Write channels */
 		{
-			fmt::print("[IOP DMA] Invalid channel number {:d}\n", channel_num);
-			std::abort();
+			uint16_t channel = ((address & 0x70) >> 4) + group * 7;
+			uint16_t offset = (address & 0xf) >> 2;
+			auto ptr = (uint32_t*)&channels[channel] + offset;
+			fmt::print("[IOP DMA] Writing {:#x} to {} of channel {:d}\n", data, REGS[offset], channel);
+
+			*ptr = data;
 		}
 	}
 }

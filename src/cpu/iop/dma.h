@@ -17,23 +17,6 @@ namespace iop
 		Chain
 	};
 
-	enum DMAChannels : uint32_t
-	{
-		MDECin,
-		MDECout,
-		SIF2,
-		CDVD,
-		SPU1,
-		PIO,
-		OTC,
-		SPU2,
-		DEV9,
-		SIF0,
-		SIF1,
-		SIO2in,
-		SIO2out
-	};
-
 	/* General info about DMA for each channel. */
 	union DMAControlReg
 	{
@@ -72,8 +55,8 @@ namespace iop
 	struct DMAChannel
 	{
 		uint32_t base;
-		DMABlockReg block_ctrl;
-		DMAControlReg channel_ctrl;
+		DMABlockReg block_conf;
+		DMAControlReg control;
 		uint32_t tadr;
 	};
 
@@ -109,12 +92,14 @@ namespace iop
 	/* The standalone registers */
 	struct DMAGlobals
 	{
-		uint32_t dpcr[2];
+		/* Lower channel globals */
+		uint32_t dpcr;
 		DICR dicr;
+
+		/* Upper channel globals */
+		uint32_t dpcr2;
 		DICR2 dicr2;
-		uint32_t pad1; /* Added so we can read the struct nicely using pointer arithmetic */
 		uint32_t dmacen;
-		uint32_t pad2;
 		uint32_t dmacinten;
 	};
 
@@ -125,20 +110,18 @@ namespace iop
 		DMAController(common::Emulator* emu);
 
 		void tick();
-		void transfer_finished(DMAChannels channel);
 
-		void start(DMAChannels channel);
-		void block_copy(DMAChannels channel);
-		void list_copy(DMAChannels channel);
+		void start(uint32_t channel);
 
 		uint32_t read(uint32_t address);
 		void write(uint32_t address, uint32_t data);
 
 	public:
-		DMAChannel channels[13] = {};
+		/* The last channel is used as a dummy */
+		DMAChannel channels[14] = {};
 		DMAGlobals globals = {};
 
-		bool irq_pending = false;
+		bool transfer_pending = false;
 		common::Emulator* emulator = nullptr;
 	};
 }
