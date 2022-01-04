@@ -94,9 +94,8 @@ namespace ee
         ~EmotionEngine();
 
         /* CPU functionality. */
-        void tick();
         void reset();
-        void fetch();
+        void tick(uint32_t cycles);
         void exception(Exception exception);
         void direct_jump();
 
@@ -137,7 +136,7 @@ namespace ee
         void op_cop2();
 
         /* Parallel instructions */
-        void op_por();
+        void op_por(); void op_padduw();
 
         /* Registers. */
         Register gpr[32] = {};

@@ -70,20 +70,20 @@ namespace ee
 			switch (timer.mode.clock)
 			{
 			case 0:
-				timer.ratio = EE_CLOCK / BUS_CLOCK; break;
+				timer.ratio = 1; break;
 			case 1:
-				timer.ratio = EE_CLOCK / (BUS_CLOCK / 16); break;
+				timer.ratio = 16; break;
 			case 2:
-				timer.ratio = EE_CLOCK / (BUS_CLOCK / 256); break;
+				timer.ratio = 256; break;
 			case 3: /* For now NTSC all the way... */
-				timer.ratio = EE_CLOCK / HBLANK_NTSC; break;
+				timer.ratio = BUS_CLOCK / HBLANK_NTSC; break;
 			}
 
 			fmt::print("[TIMERS] Setting timer {:d} clock to {}\n", num, CLOCK[timer.mode.clock]);
 		}
 	}
 
-	void Timers::tick()
+	void Timers::tick(uint32_t cycles)
 	{
 		for (uint32_t i = 0; i < 3; i++)
 		{
@@ -93,11 +93,11 @@ namespace ee
 				continue;
 
 			/* Increment internal counter according to ratio */
-			timer.counter = (timer.counter + 1) % (timer.ratio);
-			timer.count += (timer.counter == timer.ratio - 1);
+			uint32_t old_count = timer.counter;
+			timer.counter += cycles * timer.ratio;
 
 			/* Target reached */
-			if (timer.count == timer.comp)
+			if (timer.counter >= timer.compare && old_count < timer.compare)
 			{
 				/* Timer interrupts are edge-triggered: an interrupt will only be 
 				   sent to the EE if either interrupt flag goes from 0 to 1 */
@@ -109,21 +109,22 @@ namespace ee
 				/* Clear counter when it reaches target */
 				if (timer.mode.clear_when_cmp)
 				{
-					timer.count = 0;
+					timer.counter = 0;
 				}
 
 				timer.mode.cmp_flag = 1;
 			}
 
 			/* Overflow check */
-			if (timer.count > 0xffff)
+			if (timer.counter > 0xffff)
 			{
+				__debugbreak();
 				if (timer.mode.overflow_intr_enable && !timer.mode.overflow_flag)
 				{
 					intc->trigger(Interrupt::INT_TIMER0 + i);
 				}
 
-				timer.count = 0;
+				timer.counter -= 0xffff;
 				timer.mode.overflow_flag = 1;
 			}
 		}

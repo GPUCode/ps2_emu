@@ -49,6 +49,13 @@ namespace common
         0xffffffff, 0xffffffff,
     };
 
+    /* These were measured from my PAL PS2 Slim and more specifically:
+        VBLANK ON for 421376 EE cycles and 22 HBLANKS 
+        VBLANK OFF for 4498432 EE cycles and 248 HBLANKS */
+    constexpr uint32_t CYCLES_PER_FRAME = 4919808; /* VBLANK ON + VBLANK OFF */
+    constexpr uint32_t CYCLES_VBLANK_ON = 421376;
+    constexpr uint32_t CYCLES_PER_TICK = 64;
+
     enum ComponentID
     {
         EE = 0x0,

@@ -84,10 +84,19 @@ namespace common
 
     void Emulator::tick()
     {
-        ee->tick();
-        cycles_executed++;
+        uint32_t frame_cycles = CYCLES_PER_FRAME;
+        while (frame_cycles > 0)
+        {
+            uint32_t cycles = CYCLES_PER_TICK;
+            
+            /* Tick componets that run at EE speed */
+            ee->tick(cycles);
+            
+            /* Tick IOP components */
+            cycles /= 8;
+            iop->tick(cycles);
 
-        if (cycles_executed % 8 == 0)
-            iop->tick();
+            frame_cycles -= CYCLES_PER_TICK;
+        }
     }
 }

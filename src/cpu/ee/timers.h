@@ -35,13 +35,12 @@ namespace ee
 
 	struct Timer
 	{
-		uint32_t count;
+		uint32_t counter;
 		TnMode mode;
-		uint32_t comp;
+		uint32_t compare;
 		uint32_t hold; /* Only exists for T0 and T1 */
 
 		/* For use by the emulator */
-		uint32_t counter;
 		/* The variable here means that the timer will increment every *ratio* EE cycles.
 		   Since the EE has the fastest frequency I choose it use it as a comparison metric. */
 		uint32_t ratio;
@@ -53,7 +52,7 @@ namespace ee
 		Timers(common::Emulator* emulator, INTC* intc);
 		~Timers() = default;
 
-		void tick();
+		void tick(uint32_t cycles);
 
 		uint32_t read(uint32_t addr);
 		void write(uint32_t addr, uint32_t data);

@@ -47,55 +47,58 @@ namespace iop
         std::memset(gpr, 0, 32 * sizeof(uint32_t));
     }
 
-    void IOProcessor::tick()
+    void IOProcessor::tick(uint32_t cycles)
     {
-        /* Fetch next instruction. */
-        fetch();
-
-        /* Execute it. */
-        switch (instr.opcode)
+        for (int cycle = cycles; cycle > 0; cycle--)
         {
-        case 0b000000: op_special(); break;
-        case 0b000001: op_bcond(); break;
-        case 0b001111: op_lui(); break;
-        case 0b001101: op_ori(); break;
-        case 0b101011: op_sw(); break;
-        case 0b001001: op_addiu(); break;
-        case 0b001000: op_addi(); break;
-        case 0b000010: op_j(); break;
-        case 0b010000: op_cop0(); break;
-        case 0b100011: op_lw(); break;
-        case 0b000101: op_bne(); break;
-        case 0b101001: op_sh(); break;
-        case 0b000011: op_jal(); break;
-        case 0b001100: op_andi(); break;
-        case 0b101000: op_sb(); break;
-        case 0b100000: op_lb(); break;
-        case 0b000100: op_beq(); break;
-        case 0b000111: op_bgtz(); break;
-        case 0b000110: op_blez(); break;
-        case 0b100100: op_lbu(); break;
-        case 0b001010: op_slti(); break;
-        case 0b001011: op_sltiu(); break;
-        case 0b100101: op_lhu(); break;
-        case 0b100001: op_lh(); break;
-        case 0b001110: op_xori(); break;
-        case 0b101110: op_swr(); break;
-        case 0b101010: op_swl(); break;
-        case 0b100010: op_lwl(); break;
-        case 0b100110: op_lwr(); break;
-        default: exception(Exception::IllegalInstr);
+            /* Fetch next instruction. */
+            fetch();
+
+            /* Execute it. */
+            switch (instr.opcode)
+            {
+            case 0b000000: op_special(); break;
+            case 0b000001: op_bcond(); break;
+            case 0b001111: op_lui(); break;
+            case 0b001101: op_ori(); break;
+            case 0b101011: op_sw(); break;
+            case 0b001001: op_addiu(); break;
+            case 0b001000: op_addi(); break;
+            case 0b000010: op_j(); break;
+            case 0b010000: op_cop0(); break;
+            case 0b100011: op_lw(); break;
+            case 0b000101: op_bne(); break;
+            case 0b101001: op_sh(); break;
+            case 0b000011: op_jal(); break;
+            case 0b001100: op_andi(); break;
+            case 0b101000: op_sb(); break;
+            case 0b100000: op_lb(); break;
+            case 0b000100: op_beq(); break;
+            case 0b000111: op_bgtz(); break;
+            case 0b000110: op_blez(); break;
+            case 0b100100: op_lbu(); break;
+            case 0b001010: op_slti(); break;
+            case 0b001011: op_sltiu(); break;
+            case 0b100101: op_lhu(); break;
+            case 0b100001: op_lh(); break;
+            case 0b001110: op_xori(); break;
+            case 0b101110: op_swr(); break;
+            case 0b101010: op_swl(); break;
+            case 0b100010: op_lwl(); break;
+            case 0b100110: op_lwr(); break;
+            default: exception(Exception::IllegalInstr);
+            }
+
+            /* Apply pending load delays. */
+            handle_load_delay();
         }
 
-        /* Apply pending load delays. */
-        handle_load_delay();
-        
+        /* Increment timers */
+        timers.tick(cycles);
+
         /* Execute pending interrupts */
         if (intr.interrupt_pending())
             exception(Exception::Interrupt);
-
-        /* Increment timers */
-        timers.tick();
     }
 
     void IOProcessor::op_special()

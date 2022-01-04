@@ -83,7 +83,7 @@ namespace iop
         ~IOProcessor();
 
         /* CPU functionality */
-        void tick();
+        void tick(uint32_t cycles);
         void reset();
         void fetch();
         void branch();

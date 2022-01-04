@@ -28,7 +28,7 @@ namespace iop
 
 	struct Timer
 	{
-		uint64_t count;
+		uint64_t counter;
 		TimerMode mode;
 		uint64_t target;
 	};
@@ -41,7 +41,7 @@ namespace iop
 		~Timers() = default;
 
 		/* Add cycles to the timer. */
-		void tick();
+		void tick(uint32_t cycles);
 
 		/* Read/Write to the timer. */
 		uint32_t read(uint32_t address);

@@ -62,6 +62,7 @@ namespace common
 			}
 			else /* Writes from the EE */
 			{
+				/* Bit 8 most probably functions as an 'EE ready' flag */
 				if (!(data & 0x100))
 					control &= ~0x100;
 				else

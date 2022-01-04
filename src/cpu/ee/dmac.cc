@@ -1,6 +1,7 @@
 #include <cpu/ee/dmac.h>
 #include <common/emulator.h>
 #include <cassert>
+#include <cpu/ee/ee.h>
 
 inline uint32_t get_channel(uint32_t value)
 {

@@ -9,32 +9,37 @@ namespace iop
 	{
 	}
 	
-	void Timers::tick()
+	void Timers::tick(uint32_t cycles)
 	{
 		auto& timer = timers[5];
 
-		timer.count++;
-		if (timer.count == timer.target)
+		/* Update timer counter */
+		uint32_t old_count = timer.counter;
+		timer.counter += cycles;
+		
+		if (timer.counter >= timer.target && old_count < timer.target)
 		{
 			timer.mode.compare_intr_raised = true;
-			if (timer.mode.compare_intr)
+			if (timer.mode.compare_intr && timer.mode.intr_enabled)
 			{
 				iop->intr.trigger(Interrupt::Timer5);
 			}
 
 			if (timer.mode.reset_on_intr)
 			{
-				timer.count = 0;
+				timer.counter = 0;
 			}
 		}
 
-		if (timer.count > 0xFFFFFFFF)
+		if (timer.counter > 0xFFFFFFFF)
 		{
 			timer.mode.overflow_intr_raised = true;
-			if (timer.mode.overflow_intr)
+			if (timer.mode.overflow_intr && timer.mode.intr_enabled)
 			{
 				iop->intr.trigger(Interrupt::Timer5);
 			}
+
+			timer.counter -= 0xFFFFFFFF;
 		}
 	}
 	
@@ -66,11 +71,21 @@ namespace iop
 		fmt::print("[IOP TIMERS] Writing {:#x} to timer {:d} at offset {:#x}\n", data, timer + 3 * group, offset << 2);
 
 		auto ptr = (uint64_t*)&timers[timer + 3 * group] + offset;
-		if (offset == 1) /* Writes to mode reset the count to zero and set bit 10 to 1 */
+		switch (offset)
+		{
+		case 1: /* Writes to mode reset the counter to zero and set bit 10 to 1 */
 		{
 			TimerMode& mode = timers[timer].mode;
 			mode.intr_enabled = true;
-			timers[timer].count = 0;
+			timers[timer].counter = 0;
+			break;
+		}
+		case 2: /* If mode.7 (LEVL) is not set, writes to target set mode.10 to 1. */
+		{
+			TimerMode& mode = timers[timer].mode;
+			mode.intr_enabled = (mode.levl ? mode.intr_enabled : 1);
+			break;
+		}
 		}
 
 		*ptr = data;

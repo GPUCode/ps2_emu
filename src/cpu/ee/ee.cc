@@ -31,12 +31,6 @@ namespace ee
         std::fclose(disassembly);
     }
 
-    void EmotionEngine::tick()
-    {
-        /* Fetch next instruction. */
-        fetch();
-    }
-
     void EmotionEngine::reset()
     {
         /* Reset PC. */
@@ -52,77 +46,81 @@ namespace ee
         cop0.prid = 0x00002E20;
     }
 
-    void EmotionEngine::fetch()
+    void EmotionEngine::tick(uint32_t cycles)
     {
-        /* Handle branch delay slots by prefetching the next one */
-        instr = next_instr;
-
-        /* Read next instruction */
-        direct_jump();
-        log("PC: {:#x} instruction: {:#x} ", instr.pc, instr.value);
-
-        /* Skip the delay slot for any BEQ* instructions */
-        if (skip_branch_delay)
+        /* Tick the cpu for the amount of cycles requested */
+        for (int cycle = cycles; cycle > 0; cycle--)
         {
-            skip_branch_delay = false;
-            log("SKIPPED delay slot\n");
-            return;
-        }
+            /* Handle branch delay slots by prefetching the next one */
+            instr = next_instr;
 
-        switch(instr.opcode)
-        {
-        case COP0_OPCODE: op_cop0(); break;
-        case SPECIAL_OPCODE: op_special(); break;
-        case COP1_OPCODE: op_cop1(); break;
-        case 0b010010: op_cop2(); break;
-        case 0b101011: op_sw(); break;
-        case 0b001010: op_slti(); break;
-        case 0b000101: op_bne(); break;
-        case 0b001101: op_ori(); break;
-        case 0b001000: op_addi(); break;
-        case 0b011110: op_lq(); break;
-        case 0b001111: op_lui(); break;
-        case 0b001001: op_addiu(); break;
-        case 0b011100: op_mmi(); break;
-        case 0b111111: op_sd(); break;
-        case 0b000011: op_jal(); break;
-        case 0b000001: op_regimm(); break;
-        case 0b001100: op_andi(); break;
-        case 0b000100: op_beq(); break;
-        case 0b010100: op_beql(); break;
-        case 0b001011: op_sltiu(); break;
-        case 0b010101: op_bnel(); break;
-        case 0b100000: op_lb(); break;
-        case 0b111001: op_swc1(); break;
-        case 0b100100: op_lbu(); break;
-        case 0b110111: op_ld(); break;
-        case 0b000010: op_j(); break;
-        case 0b100011: op_lw(); break;
-        case 0b101000: op_sb(); break;
-        case 0b000110: op_blez(); break;
-        case 0b000111: op_bgtz(); break;
-        case 0b100101: op_lhu(); break;
-        case 0b101001: op_sh(); break;
-        case 0b001110: op_xori(); break;
-        case 0b011001: op_daddiu(); break;
-        case 0b011111: op_sq(); break;
-        case 0b100001: op_lh(); break;
-        case 0b101111: op_cache(); break;
-        case 0b100111: op_lwu(); break;
-        case 0b011010: op_ldl(); break;
-        case 0b011011: op_ldr(); break;
-        case 0b101100: op_sdl(); break;
-        case 0b101101: op_sdr(); break;
-        default:
-            fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
-            std::abort();
+            /* Read next instruction */
+            direct_jump();
+            log("PC: {:#x} instruction: {:#x} ", instr.pc, instr.value);
+
+            /* Skip the delay slot for any BEQ* instructions */
+            if (skip_branch_delay)
+            {
+                skip_branch_delay = false;
+                log("SKIPPED delay slot\n");
+                return;
+            }
+
+            switch (instr.opcode)
+            {
+            case COP0_OPCODE: op_cop0(); break;
+            case SPECIAL_OPCODE: op_special(); break;
+            case COP1_OPCODE: op_cop1(); break;
+            case 0b010010: op_cop2(); break;
+            case 0b101011: op_sw(); break;
+            case 0b001010: op_slti(); break;
+            case 0b000101: op_bne(); break;
+            case 0b001101: op_ori(); break;
+            case 0b001000: op_addi(); break;
+            case 0b011110: op_lq(); break;
+            case 0b001111: op_lui(); break;
+            case 0b001001: op_addiu(); break;
+            case 0b011100: op_mmi(); break;
+            case 0b111111: op_sd(); break;
+            case 0b000011: op_jal(); break;
+            case 0b000001: op_regimm(); break;
+            case 0b001100: op_andi(); break;
+            case 0b000100: op_beq(); break;
+            case 0b010100: op_beql(); break;
+            case 0b001011: op_sltiu(); break;
+            case 0b010101: op_bnel(); break;
+            case 0b100000: op_lb(); break;
+            case 0b111001: op_swc1(); break;
+            case 0b100100: op_lbu(); break;
+            case 0b110111: op_ld(); break;
+            case 0b000010: op_j(); break;
+            case 0b100011: op_lw(); break;
+            case 0b101000: op_sb(); break;
+            case 0b000110: op_blez(); break;
+            case 0b000111: op_bgtz(); break;
+            case 0b100101: op_lhu(); break;
+            case 0b101001: op_sh(); break;
+            case 0b001110: op_xori(); break;
+            case 0b011001: op_daddiu(); break;
+            case 0b011111: op_sq(); break;
+            case 0b100001: op_lh(); break;
+            case 0b101111: op_cache(); break;
+            case 0b100111: op_lwu(); break;
+            case 0b011010: op_ldl(); break;
+            case 0b011011: op_ldr(); break;
+            case 0b101100: op_sdl(); break;
+            case 0b101101: op_sdr(); break;
+            default:
+                fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
+                std::abort();
+            }
         }
 
         /* Increment COP0 counter */
-        cop0.count++;
+        cop0.count += cycles;
 
-        /* Tick the timers */
-        timers.tick();
+        /* Tick the timers for BUSCLK cycles */
+        timers.tick(cycles / 2);
 
         /* Check for interrupts */
         if (intc.int_pending())
@@ -1051,6 +1049,22 @@ namespace ee
         gpr[rd].dword[1] = gpr[rs].dword[1] | gpr[rt].dword[1];
     }
 
+    void EmotionEngine::op_padduw()
+    {
+        uint16_t rt = instr.r_type.rt;
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        
+        /* SIMD needed here! */
+        for (int i = 0; i < 4; i++)
+        {
+            uint64_t result = (uint64_t)gpr[rt].word[i] + (uint64_t)gpr[rs].word[i];
+            gpr[rd].word[i] = (result > 0xffffffff ? 0xffffffff : result);
+        }
+
+        log("PADDUW: GPR[{}] = GPR[{}] + GPR[{}]\n", rd, rs, rt);
+    }
+
     void EmotionEngine::op_dsrav()
     {
         uint16_t rs = instr.r_type.rs;
@@ -1158,14 +1172,27 @@ namespace ee
         case 0b010010: op_mflo1(); break;
         case 0b011000: op_mult1(); break;
         case 0b101001:
+        {
             switch (instr.r_type.sa)
             {
             case 0b10010: op_por(); break;
             default:
-                fmt::print("[ERROR] Unimplemented MMI3 instruction: {:#05b}\n", (uint16_t)instr.r_type.sa);
+                fmt::print("[ERROR] Unimplemented MMI3 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
                 std::abort();
             }
             break;
+        }
+        case 0b101000:
+        {
+            switch (instr.r_type.sa)
+            {
+            case 0b10000: op_padduw(); break;
+            default:
+                fmt::print("[ERROR] Unimplemented MMI1 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
+                std::abort();
+            }
+            break;
+        }
         default:
             fmt::print("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.funct);
 		    std::abort();
