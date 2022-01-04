@@ -55,7 +55,6 @@ namespace ee
 		auto ptr = (uint32_t*)&timers[num] + offset;
 
 		fmt::print("[TIMERS] Writing {:#x} to {} of timer {:d}\n", data, REGS[offset], num);
-		*ptr = data;
 
 		/* Writes to Tn_MODE */
 		if (offset == 1)
@@ -67,7 +66,7 @@ namespace ee
 			   1=Bus clock / 16
 			   2=Bus clock / 256
 			   3=HBLANK */
-			switch (timer.mode.clock)
+			switch (data & 0x3)
 			{
 			case 0:
 				timer.ratio = 1; break;
@@ -79,8 +78,13 @@ namespace ee
 				timer.ratio = BUS_CLOCK / HBLANK_NTSC; break;
 			}
 
+			/* Writes clear interrupt flags */
+			data &= 0x3ff;
+
 			fmt::print("[TIMERS] Setting timer {:d} clock to {}\n", num, CLOCK[timer.mode.clock]);
 		}
+
+		*ptr = data;
 	}
 
 	void Timers::tick(uint32_t cycles)
@@ -104,6 +108,7 @@ namespace ee
 				if (timer.mode.cmp_intr_enable && !timer.mode.cmp_flag)
 				{
 					intc->trigger(Interrupt::INT_TIMER0 + i);
+					timer.mode.cmp_flag = 1;
 				}
 
 				/* Clear counter when it reaches target */
@@ -111,21 +116,18 @@ namespace ee
 				{
 					timer.counter = 0;
 				}
-
-				timer.mode.cmp_flag = 1;
 			}
 
 			/* Overflow check */
 			if (timer.counter > 0xffff)
 			{
-				__debugbreak();
 				if (timer.mode.overflow_intr_enable && !timer.mode.overflow_flag)
 				{
 					intc->trigger(Interrupt::INT_TIMER0 + i);
+					timer.mode.overflow_flag = 1;
 				}
 
 				timer.counter -= 0xffff;
-				timer.mode.overflow_flag = 1;
 			}
 		}
 	}
