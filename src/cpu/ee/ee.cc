@@ -132,9 +132,12 @@ namespace ee
         }
     }
 
-    void EmotionEngine::exception(Exception exception)
+    void EmotionEngine::exception(Exception exception, bool log)
     {
-        fmt::print("[INFO] Exception occured of type {:d}!\n", (uint32_t)exception);
+        if (log) [[likely]]
+        {
+            fmt::print("[INFO] Exception occured of type {:d}!\n", (uint32_t)exception);
+        }
 
         ExceptionVector vector = ExceptionVector::V_COMMON;
         cop0.cause.exccode = (uint32_t)exception;
@@ -1007,17 +1010,16 @@ namespace ee
         uint32_t id = gpr[3].word[0];
         switch (id)
         {
-        case 0x16: strcpy_s(syscall, "_EnableDmac"); break;
-        case 0x12: strcpy_s(syscall, "AddDmacHandler"); break;
-        case 0x3c: strcpy_s(syscall, "InitMainThread"); break;
-        case 0x3d: strcpy_s(syscall, "InitHeap"); break;
-        case 0x64: strcpy_s(syscall, "FlushCache"); break;
-        case 0x77: strcpy_s(syscall, "SifSetDma"); break;
-        case 0x7c: strcpy_s(syscall, "Deci2Call"); break;
+        case 0x16: fmt::print("[EE] Executing _EnableDmac with id 0x16\n"); break;
+        case 0x12: fmt::print("[EE] Executing AddDmacHandler with id 0x12\n"); break;
+        case 0x3c: fmt::print("[EE] Executing InitMainThread with id 0x3c\n"); break;
+        case 0x3d: fmt::print("[EE] Executing InitHeap with id 0x3d\n"); break;
+        case 0x64: fmt::print("[EE] Executing FlushCache with id 0x64\n"); break;
+        case 0x77: fmt::print("[EE] Executing SifSetDma with id 0x77\n"); break;
+        case 0x7c: fmt::print("[EE] Executing Deci2Call with id 0x7c\n"); break;
         }
 
-        fmt::print("[EE] Executing {} with id {:d}\n", syscall, id);
-        exception(Exception::Syscall);
+        exception(Exception::Syscall, false);
     }
 
     void EmotionEngine::op_bltzl()

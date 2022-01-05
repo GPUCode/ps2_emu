@@ -96,7 +96,7 @@ namespace ee
         /* CPU functionality. */
         void reset();
         void tick(uint32_t cycles);
-        void exception(Exception exception);
+        void exception(Exception exception, bool log = true);
         void direct_jump();
 
         /* Memory operations */

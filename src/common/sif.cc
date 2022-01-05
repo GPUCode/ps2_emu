@@ -27,7 +27,7 @@ namespace common
 		uint16_t offset = (addr >> 4) & 0xf;
 		auto ptr = (uint32_t*)&regs + offset;
 
-		fmt::print("[SIF][{}] Read {:#x} from {}\n", COMP[comp], *ptr, REGS[offset]);
+		/*fmt::print("[SIF][{}] Read {:#x} from {}\n", COMP[comp], *ptr, REGS[offset]);*/
 
 		return *ptr;
 	}
