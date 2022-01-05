@@ -54,8 +54,6 @@ namespace ee
             /* Handle branch delay slots by prefetching the next one */
             instr = next_instr;
 
-            if (instr.pc == 0x80005184) __debugbreak();
-
             /* Read next instruction */
             direct_jump();
             log("PC: {:#x} instruction: {:#x} ", instr.pc, instr.value);
@@ -185,32 +183,46 @@ namespace ee
             return;
 
         uint16_t type = instr.value >> 21 & 0x1F;
-	    switch (type)
-	    {
-	    case COP0_MF0:
-		    switch(instr.value & 0x7)
+        switch (type)
+        {
+        case COP0_MF0:
+        {
+            switch (instr.value & 0x7)
             {
-            case 0b000: op_mfc0(); break; 
+            case 0b000: op_mfc0(); break;
             default:
                 fmt::print("[ERROR] Unimplemented COP0 MF0 instruction: {:#03b}\n", instr.value & 0x7);
-                std::exit(1);
+                std::abort();
             }
             break;
+        }
         case COP0_MT0:
+        {
             switch (instr.value & 0x7)
             {
             case 0b000: op_mtc0(); break;
             default:
                 fmt::print("[ERROR] Unimplemented COP0 MT0 instruction: {:#03b}\n", instr.value & 0x7);
-                std::exit(1);
+                std::abort();
             }
             break;
+        }
 	    case COP0_TLB:
-            if ((instr.value & 0x3F) == 0b000010) op_tlbwi();
+        {
+            auto fmt = instr.value & 0x3f;
+            switch (fmt)
+            {
+            case 0b000010: op_tlbwi(); break;
+            case 0b111001: op_di(); break;
+            case 0b011000: op_eret(); break;
+            default:
+                fmt::print("[ERROR] Unimplemented COP0 TLB instruction {:#08b}\n", fmt);
+            }
             break;
+        }
 	    default:
 		    fmt::print("[ERROR] Unimplemented COP0 instruction: {:#05b}\n", type);
-		    std::exit(1);
+		    std::abort();
 	    }
     }
 
@@ -975,6 +987,35 @@ namespace ee
         gpr[rd].dword[0] = gpr[rt].dword[0] >> (sa + 32);
 
         log("DSRL32: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].dword[0], sa);
+    }
+
+    void EmotionEngine::op_di()
+    {
+        auto& status = cop0.status;
+        if (status.edi || status.exl || status.erl || !status.ksu)
+        {
+            status.eie = 0;
+        }
+
+        log("DI: STATUS.EIE = {:d}\n", (uint16_t)status.eie);
+    }
+
+    void EmotionEngine::op_eret()
+    {
+        log("ERET!\n");
+        auto& status = cop0.status;
+        if (status.erl)
+        {
+            pc = cop0.error_epc;
+            status.erl = 0;
+        }
+        else
+        {
+            pc = cop0.epc;
+            status.exl = 0;
+        }
+
+        next_instr.is_delay_slot = true;
     }
 
     void EmotionEngine::op_cop1()

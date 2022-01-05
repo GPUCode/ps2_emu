@@ -129,6 +129,9 @@ namespace ee
         void op_lwu(); void op_ldl(); void op_ldr(); void op_sdl();
         void op_sdr(); void op_dsrl(); void op_srlv(); void op_dsrl32();
 
+        /* COP0 instructions */
+        void op_di(); void op_eret();
+
         /* COP1 instructions */
         void op_cop1(); void op_mtc1(); void op_ctc1();
 
