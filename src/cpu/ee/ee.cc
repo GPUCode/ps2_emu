@@ -7,7 +7,7 @@
 #define log(...) (void)0
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
-#define log(...) fmt::print(disassembly, __VA_ARGS__)
+#define log(...) if ((instr.pc & 0xf0000000) == 0x80000000) fmt::print(disassembly, __VA_ARGS__)
 #endif
 
 namespace ee
@@ -53,6 +53,8 @@ namespace ee
         {
             /* Handle branch delay slots by prefetching the next one */
             instr = next_instr;
+
+            if (instr.pc == 0x80005184) __debugbreak();
 
             /* Read next instruction */
             direct_jump();
