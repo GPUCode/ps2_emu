@@ -3,11 +3,13 @@
 #include <common/emulator.h>
 #include <fmt/color.h>
 
-#ifndef NDEBUG
+bool print_pc = false;
+
+#ifdef NDEBUG
 #define log(...) (void)0
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
-#define log(...) if ((instr.pc & 0xf0000000) == 0x80000000) fmt::print(disassembly, __VA_ARGS__)
+#define log(...) if (print_pc) fmt::print(disassembly, __VA_ARGS__)
 #endif
 
 namespace ee
@@ -63,7 +65,7 @@ namespace ee
             {
                 skip_branch_delay = false;
                 log("SKIPPED delay slot\n");
-                return;
+                continue;
             }
 
             switch (instr.opcode)
@@ -319,8 +321,14 @@ namespace ee
 
         gpr[rd].dword[0] = (uint64_t)(int32_t)(gpr[rt].word[0] << sa);
 
-        if (instr.value == 0) log("NOP\n");
-        else log("SLL: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d}\n", rd, rt, gpr[rt].dword[0], sa);
+        if (instr.value == 0) 
+        {
+            log("NOP\n");
+        }
+        else
+        {
+            log("SLL: GPR[{:d}] = GPR[{:d}] ({:#x}) << {:d}\n", rd, rt, gpr[rt].dword[0], sa);
+        }
     }
 
     void EmotionEngine::op_slti()
@@ -1070,7 +1078,8 @@ namespace ee
             status.exl = 0;
         }
 
-        next_instr.is_delay_slot = true;
+        /* Skip branch delay slot */
+        direct_jump();
     }
 
     void EmotionEngine::op_cop1()
@@ -1224,14 +1233,16 @@ namespace ee
 
         uint32_t vaddr = offset + gpr[base].word[0];
 
-        log("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
         if (vaddr & 0x3) [[unlikely]]
         {
             log("[ERROR] LW: Address {:#x} is not aligned\n", vaddr);
             exception(Exception::AddrErrorLoad);
         }
         else
+        {
             gpr[rt].dword[0] = (int32_t)read<uint32_t>(vaddr);
+            log("LW: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+        }
     }
 
     void EmotionEngine::op_addiu()
