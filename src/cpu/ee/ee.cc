@@ -270,6 +270,7 @@ namespace ee
         case 0b111010: op_dsrl(); break;
         case 0b000110: op_srlv(); break;
         case 0b111110: op_dsrl32(); break;
+        case 0b001100: op_syscall(); break;
         default:
             fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		    std::abort();
@@ -283,8 +284,10 @@ namespace ee
         {
         case 0b00001: op_bgez(); break;
         case 0b00000: op_bltz(); break;
+        case 0b00010: op_bltzl(); break;
+        case 0b00011: op_bgezl(); break;
         default:
-            fmt::print("[ERROR] Unimplemented REGIMM instruction: {:#05b}\n", type);
+            fmt::print("[ERROR] Unimplemented REGIMM instruction: {:#07b}\n", type);
 		    std::exit(1);
         }
     }
@@ -987,6 +990,58 @@ namespace ee
         gpr[rd].dword[0] = gpr[rt].dword[0] >> (sa + 32);
 
         log("DSRL32: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].dword[0], sa);
+    }
+
+    void EmotionEngine::op_syscall()
+    {
+        static char syscall[30] = "syscall";
+        
+        uint32_t id = gpr[3].word[0];
+        switch (id)
+        {
+        case 0x16: strcpy_s(syscall, "_EnableDmac"); break;
+        case 0x12: strcpy_s(syscall, "AddDmacHandler"); break;
+        case 0x3c: strcpy_s(syscall, "InitMainThread"); break;
+        case 0x3d: strcpy_s(syscall, "InitHeap"); break;
+        case 0x64: strcpy_s(syscall, "FlushCache"); break;
+        case 0x77: strcpy_s(syscall, "SifSetDma"); break;
+        case 0x7c: strcpy_s(syscall, "Deci2Call"); break;
+        }
+
+        fmt::print("[EE] Executing {} with id {:d}\n", syscall, id);
+        exception(Exception::Syscall);
+    }
+
+    void EmotionEngine::op_bltzl()
+    {
+        uint16_t rs = instr.i_type.rs;
+        int32_t imm = (int16_t)instr.i_type.immediate;
+
+        int32_t offset = imm << 2;
+        int64_t reg = gpr[rs].dword[0];
+        if (reg < 0)
+            pc += offset - 4;
+        else
+            skip_branch_delay = true;
+
+        next_instr.is_delay_slot = !skip_branch_delay;
+        log("BLTZL: IF GPR[{:d}] ({:#x}) < 0 THEN PC += {:#x}\n", rs, reg, offset);
+    }
+
+    void EmotionEngine::op_bgezl()
+    {
+        uint16_t rs = instr.i_type.rs;
+        int32_t imm = (int16_t)instr.i_type.immediate;
+
+        int32_t offset = imm << 2;
+        int64_t reg = gpr[rs].dword[0];
+        if (reg >= 0)
+            pc += offset - 4;
+        else
+            skip_branch_delay = true;
+
+        next_instr.is_delay_slot = !skip_branch_delay;
+        log("BGEZL: IF GPR[{:d}] ({:#x}) >= 0 THEN PC += {:#x}\n", rs, reg, offset);
     }
 
     void EmotionEngine::op_di()
