@@ -1249,18 +1249,14 @@ namespace ee
 
         for (int i = 0; i < 2; i++)
         {
-            auto word = gpr[rs].word[i];
-            bool high_bit = word & (1 << 31);
-            uint8_t bits = 0;
-            for (int j = 30; j >= 0; j--)
-            {
-                if ((word & (1 << j)) == (high_bit << j))
-                    bits++;
-                else
-                    break;
-            }
-            
-            gpr[rd].word[i] = bits;
+            uint32_t word = gpr[rs].word[i];
+            bool msb = word & (1 << 31);
+            /* To count the leading ones, invert it so
+               we can count zeros */
+            word = (msb ? ~word : word);
+            /* Passing zero to __builtin_clz produces undefined results.
+               Thankfully when the number is zero the answer is always 0x1f */
+            gpr[rd].word[i] = (word != 0 ? __builtin_clz(word) - 1 : 0x1f);
         }
 
         log("PLZCW\n");
