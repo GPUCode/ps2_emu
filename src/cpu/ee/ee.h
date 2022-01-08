@@ -71,7 +71,7 @@ namespace ee
         V_INTERRUPT = 0x200
     };
 
-    enum class Exception
+    enum Exception
     {
         Interrupt = 0,
         TLBModified = 1,
@@ -128,13 +128,14 @@ namespace ee
         void op_cache(); void op_sllv(); void op_srav(); void op_nor();
         void op_lwu(); void op_ldl(); void op_ldr(); void op_sdl();
         void op_sdr(); void op_dsrl(); void op_srlv(); void op_dsrl32();
-        void op_syscall(); void op_bltzl(); void op_bgezl();
+        void op_syscall(); void op_bltzl(); void op_bgezl(); void op_mfsa();
+        void op_mthi(); void op_mtlo(); void op_mtsa();
 
         /* COP0 instructions */
-        void op_di(); void op_eret();
+        void op_di(); void op_eret(); void op_ei();
 
         /* COP1 instructions */
-        void op_cop1(); void op_mtc1(); void op_ctc1();
+        void op_cop1(); void op_mtc1(); void op_ctc1(); void op_cfc1();
 
         /* COP2 instructions */
         void op_cop2();
@@ -142,11 +143,14 @@ namespace ee
         /* Parallel instructions */
         void op_por(); void op_padduw();
 
+        /* MMI instructions */
+        void op_plzcw(); void op_mfhi1(); void op_mthi1(); void op_mtlo1();
+
         /* Registers. */
         Register gpr[32] = {};
         uint32_t pc;
-        uint64_t hi0, hi1, lo0, lo1;
-        uint32_t sa;
+        uint64_t hi0 = 0, hi1 = 0, lo0 = 0, lo1 = 0;
+        uint32_t sa = 0;
         Instruction instr, next_instr;
         uint32_t exception_addr[2] = { 0x80000000, 0xBFC00200 };
         bool skip_branch_delay = false;
@@ -253,6 +257,9 @@ namespace ee
         case 0x70000000 ... 0x70003fff:
             *(T*)&scratchpad[paddr & 0x3FFF] = data;
             break;
+        case 0x1000f500: /* Hold off some uknown addresses */
+        case 0x1000f510:
+            return;
         default:
             emulator->write<T, common::ComponentID::EE>(paddr, data);
         }

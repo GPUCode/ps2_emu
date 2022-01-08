@@ -8,6 +8,9 @@ namespace common
 
 namespace ee
 {
+	/* Have some common DMA tag ids */
+	constexpr uint32_t DMATAG_END = 0x7;
+
 	union TagAddr
 	{
 		uint32_t value;
@@ -18,15 +21,51 @@ namespace ee
 		};
 	};
 
+	union DMATag
+	{
+		uint128_t value;
+		struct
+		{
+			uint128_t qwords : 16;
+			uint128_t : 11;
+			uint128_t priority : 2;
+			uint128_t id : 2;
+			uint128_t irq : 1;
+			uint128_t address : 31;
+			uint128_t mem_select : 1;
+			uint128_t data : 64;
+		};
+	};
+
+	union DCHCR
+	{
+		uint32_t value;
+		struct
+		{
+			uint32_t direction : 1; /* 0 = to memory, 1 = from memory */
+			uint32_t : 1;
+			uint32_t mode : 2; /* 0 = normal, 1 = chain, 2 = interleave */
+			uint32_t stack_ptr : 2;
+			uint32_t transfer_tag : 1;
+			uint32_t enable_irq_bit : 1;
+			uint32_t running : 1;
+			uint32_t : 7;
+			uint32_t tag : 16;
+		};
+	};
+
 	struct DMACChannel
 	{
-		uint32_t control;
+		DCHCR control;
 		uint32_t address;
 		uint32_t qword_count;
 		TagAddr tag_address;
 		TagAddr saved_tag_address[2];
 		uint32_t padding[2];
 		uint32_t scratchpad_address;
+
+		/* For use by emulator */
+		bool end_transfer = false;
 	};
 
 	/* Writing to this is a pain */
@@ -65,6 +104,33 @@ namespace ee
 		uint32_t d_rbsr;
 		uint32_t d_rbor;
 		uint32_t d_stadr;
+		uint32_t d_enable = 0x1201;
+	};
+
+	enum DMAChannels : uint32_t
+	{
+		VIF0,
+		VIF1,
+		GIF,
+		IPU_FROM,
+		IPU_TO,
+		SIF0, /* from IOP */
+		SIF1, /* to IOP */
+		SIF2,
+		SPR_FROM,
+		SPR_TO
+	};
+
+	enum DMASourceID : uint32_t
+	{
+		REFE,
+		CNT,
+		NEXT,
+		REF,
+		REFS,
+		CALL,
+		RET,
+		END
 	};
 
 	struct DMAController : public common::Component
@@ -74,10 +140,17 @@ namespace ee
 
 		/* I/O communication */
 		uint32_t read_channel(uint32_t addr);
-		void write_channel(uint32_t addr, uint32_t data);
-
 		uint32_t read_global(uint32_t addr);
+		uint32_t read_enabler(uint32_t addr);
+
+		void write_channel(uint32_t addr, uint32_t data);
 		void write_global(uint32_t addr, uint32_t data);
+		void write_enabler(uint32_t addr, uint32_t data);
+
+		void tick(uint32_t cycles);
+
+	private:
+		void fetch_tag(uint32_t id);
 
 	private:
 		common::Emulator* emulator;

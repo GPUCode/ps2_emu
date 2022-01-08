@@ -70,7 +70,7 @@ namespace iop
 			uint32_t BDAM;		/* Breakpoint Data Address Mask */
 			uint32_t r10;
 			uint32_t BpcM;		/* Breakpoint Program Counter Mask */
-			COP0STAT sr;	    /* Status */
+			COP0STAT status;	/* Status */
 			COP0CAUSE cause;	/* Cause */
 			uint32_t epc;		/* Exception Program Counter */
 			uint32_t PRId;		/* Processor Revision Identifier */

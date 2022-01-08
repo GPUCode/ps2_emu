@@ -43,6 +43,7 @@ namespace ee
 	{
 		void execute(Instruction instr);
 		void op_adda(Instruction instr);
+		void op_madd(Instruction instr);
 
 		FPR fpr[32];
 		FCR0 fcr0;

@@ -40,7 +40,7 @@ namespace common
     constexpr uint32_t KUSEG_MASKS[8] = 
     {
         /* KUSEG: Don't touch the address, it's fine */
-        0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
+        0xffffffff, 0x1fffffff, 0xffffffff, 0xffffffff,
         /* KSEG0: Strip the MSB (0x8 -> 0x0 and 0x9 -> 0x1) */
         0x7fffffff,
         /* KSEG1: Strip the 3 MSB's (0xA -> 0x0 and 0xB -> 0x1) */
@@ -54,7 +54,8 @@ namespace common
         VBLANK OFF for 4498432 EE cycles and 248 HBLANKS */
     constexpr uint32_t CYCLES_PER_FRAME = 4919808; /* VBLANK ON + VBLANK OFF */
     constexpr uint32_t CYCLES_VBLANK_ON = 421376;
-    constexpr uint32_t CYCLES_PER_TICK = 64;
+    constexpr uint32_t CYCLES_VBLANK_OFF = 4498432;
+    constexpr uint32_t CYCLES_PER_TICK = 32;
 
     enum ComponentID
     {
@@ -115,7 +116,7 @@ namespace common
 
         /* Utilities */
         const char* component_name[2] = { "EE", "IOP" };
-        std::atomic_bool stop_thread = false;
+        bool stop = false;
         std::ofstream console;
     };
 

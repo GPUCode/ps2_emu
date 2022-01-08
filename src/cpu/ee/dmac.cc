@@ -1,7 +1,8 @@
 #include <cpu/ee/dmac.h>
 #include <common/emulator.h>
-#include <cassert>
 #include <cpu/ee/ee.h>
+#include <common/sif.h>
+#include <cassert>
 
 inline uint32_t get_channel(uint32_t value)
 {
@@ -65,6 +66,8 @@ namespace ee
 
 		/* Register global register handlers */
 		emulator->add_handler(0x1000E000, this, &DMAController::read_global, &DMAController::write_global);
+		emulator->add_handler(0x1000F520, this, &DMAController::read_enabler, nullptr);
+		emulator->add_handler(0x1000F590, this, nullptr, &DMAController::write_enabler);
 	}
 
 	uint32_t DMAController::read_channel(uint32_t addr)
@@ -91,6 +94,11 @@ namespace ee
 
 		fmt::print("[DMAC] Writing {:#x} to {} of channel {:d}\n", data, REGS[offset], channel);
 		*ptr = data;
+
+		if (channels[channel].control.running)
+		{
+			fmt::print("\n[DMAC] Transfer for channel {:d} started!\n\n", channel);
+		}
 	}
 
 	uint32_t DMAController::read_global(uint32_t addr)
@@ -104,6 +112,14 @@ namespace ee
 		return *ptr;
 	}
 
+	uint32_t DMAController::read_enabler(uint32_t addr)
+	{
+		assert(addr == 0x1000F520);
+
+		fmt::print("[DMAC] Reading D_ENABLER = {:#x}\n", globals.d_enable);
+		return globals.d_enable;
+	}
+
 	void DMAController::write_global(uint32_t addr, uint32_t data)
 	{
 		assert(addr <= 0x1000E060);
@@ -115,13 +131,216 @@ namespace ee
 
 		if (offset == 1) /* D_STAT */
 		{
+			auto& cop0 = emulator->ee->cop0;
+
 			/* The lower bits are cleared while the upper ones are reversed */
 			globals.d_stat.clear &= ~(data & 0xffff);
 			globals.d_stat.reverse ^= (data >> 16);
+
+			/* IMPORTANT: Update COP0 INT1 status when D_STAT is written */
+			cop0.cause.ip1_pending = globals.d_stat.channel_irq & globals.d_stat.channel_irq_mask;
 		}
 		else
 		{
 			*ptr = data;
+		}
+	}
+
+	void DMAController::write_enabler(uint32_t addr, uint32_t data)
+	{
+		assert(addr == 0x1000F590);
+
+		fmt::print("[DMAC] Writing D_ENABLEW = {:#x}\n", data);
+		globals.d_enable = data;
+	}
+
+	void DMAController::tick(uint32_t cycles)
+	{
+		if (globals.d_enable & 0x10000)
+			return;
+
+		for (int cycle = cycles; cycle > 0; cycle--)
+		{
+			/* Check each channel */
+			for (uint32_t id = 0; id < 10; id++)
+			{
+				auto& channel = channels[id];
+				if (channel.control.running)
+				{
+					/* Transfer any pending qwords */
+					if (channel.qword_count > 0)
+					{
+						/* This is channel specific */
+						switch (id)
+						{
+						case DMAChannels::SIF0:
+						{
+							/* SIF0 receives data from the SIF0 fifo */
+							auto& sif = emulator->sif;
+							if (sif->sif0_fifo.size() >= 4)
+							{
+								uint32_t data[4];
+								for (int i = 0; i < 4; i++)
+								{
+									data[i] = sif->sif0_fifo.front();
+									sif->sif0_fifo.pop();
+								}
+
+								uint128_t qword = *(uint128_t*)data;
+								uint64_t upper = qword >> 64, lower = qword;
+								fmt::print("[DMAC][SIF0] Receiving packet from SIF0 FIFO: {:#x}{:016x}\n", upper, lower);
+
+								/* Write the packet to the specified address */
+								emulator->ee->write(channel.address, qword);
+
+								/* MADR/TADR update while a transfer is ongoing */
+								channel.qword_count--;
+								channel.address += 16;
+							}
+
+							break;
+						}
+						case DMAChannels::SIF1:
+						{
+							/* SIF1 pushes data to the SIF1 fifo */
+							auto& sif = emulator->sif;
+							
+							uint128_t qword = *(uint128_t*)&emulator->ee->ram[channel.address];
+							uint32_t* data = (uint32_t*)&qword;
+							for (int i = 0; i < 4; i++)
+							{
+								sif->sif1_fifo.push(data[i]);
+							}
+
+							uint64_t upper = qword >> 64, lower = qword;
+							fmt::print("[DMAC][SIF1] Transfering to SIF1 FIFO: {:#x}{:016x}\n", upper, lower);
+
+							/* MADR/TADR update while a transfer is ongoing */
+							channel.qword_count--;
+							channel.address += 16;
+							break;
+						}
+						default:
+							fmt::print("[DMAC] Unknown channel transfer with id {:d}\n", id);
+						}
+					} /* If the transfer ended, disable channel */
+					else if (channel.end_transfer)
+					{
+						fmt::print("[DMAC] End transfer of channel {:d}\n", id);
+
+						/* End the transfer */
+						channel.end_transfer = false;
+						channel.control.running = 0;
+
+						/* Set the channel bit in the interrupt field of D_STAT */
+						globals.d_stat.channel_irq |= (1 << id);
+
+						/* Check for interrupts */
+						if (globals.d_stat.channel_irq & globals.d_stat.channel_irq_mask)
+						{
+							fmt::print("\n[DMAC] INT1!\n\n");
+							emulator->ee->cop0.cause.ip1_pending = 1;
+						}
+					}
+					else /* Read the next DMAtag */
+					{
+						fetch_tag(id);
+					}
+				}
+			}
+		}
+	}
+	
+	void DMAController::fetch_tag(uint32_t id)
+	{
+		DMATag tag;
+		auto& channel = channels[id];
+		switch (id)
+		{
+		case DMAChannels::SIF0:
+		{
+			auto& sif = emulator->sif;
+			if (sif->sif0_fifo.size() >= 2)
+			{
+				uint32_t data[2] = {};
+				for (int i = 0; i < 2; i++)
+				{
+					data[i] = sif->sif0_fifo.front();
+					sif->sif0_fifo.pop();
+				}
+
+				tag.value = *(uint64_t*)data;
+				fmt::print("[DMAC] Read SIF0 DMA tag {:#x}\n", (uint64_t)tag.value);
+
+				/* Update channel from tag */
+				channel.qword_count = tag.qwords;
+				channel.control.tag = (tag.value >> 16) & 0xffff;
+				channel.tag_address.address += 16;
+
+				uint16_t tag_id = tag.id;
+				switch (tag_id)
+				{
+				case 0:
+				{
+					/* MADR=DMAtag.ADDR */
+					channel.address = tag.address;
+					break;
+				}
+				default:
+					fmt::print("\n[DMAC] Unrecognized SIF0 DMAtag id {:d}\n", tag_id);
+					std::abort();
+				}
+
+				if (channel.control.enable_irq_bit && tag.irq)
+				{
+					/* Just end transfer, since an interrupt will be raised there anyways */
+					channel.end_transfer = true;
+				}
+			}
+			break;
+		}
+		case DMAChannels::SIF1:
+		{
+			auto address = channel.tag_address.address;
+
+			/* Get tag from memory */
+			/* TODO: Access to other memory types */
+			tag.value = *(uint128_t*)&emulator->ee->ram[address];
+			fmt::print("[DMAC] Read SIF1 DMA tag {:#x}\n", (uint64_t)tag.value);
+
+			/* Update channel from tag */
+			channel.qword_count = tag.qwords;
+			channel.control.tag = (tag.value >> 16) & 0xffff;
+
+			uint16_t tag_id = tag.id;
+			switch (tag_id)
+			{
+			case DMASourceID::REFE:
+			{
+				/* MADR=DMAtag.ADDR
+				   TADR+=16
+				   tag_end=true */
+				channel.address = tag.address;
+				channel.tag_address.address += 16;
+				channel.end_transfer = true;
+				break;
+			}
+			default:
+				fmt::print("\n[DMAC] Unrecognized SIF1 DMAtag id {:d}\n", tag_id);
+				std::abort();
+			}
+
+			if (channel.control.enable_irq_bit && tag.irq)
+			{
+				/* Just end transfer, since an interrupt will be raised there anyways */
+				channel.end_transfer = true;
+			}
+
+			break;
+		}
+		default:
+			fmt::print("[DMAC] Unknown channel {:d}\n", id);
+			std::abort();
 		}
 	}
 }

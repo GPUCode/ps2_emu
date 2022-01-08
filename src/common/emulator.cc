@@ -1,8 +1,10 @@
 #include <common/emulator.h>
 #include <common/sif.h>
 #include <cpu/ee/ee.h>
+#include <cpu/ee/intc.h>
 #include <cpu/ee/dmac.h>
 #include <cpu/iop/iop.h>
+#include <cpu/iop/intr.h>
 #include <cpu/vu/vu0.h>
 #include <cpu/vu/vif.h>
 #include <gs/gif.h>
@@ -84,19 +86,37 @@ namespace common
 
     void Emulator::tick()
     {
-        uint32_t frame_cycles = CYCLES_PER_FRAME;
-        while (frame_cycles > 0)
+        uint32_t total_cycles = 0;
+        bool vblank_started = false;
+        while (total_cycles < CYCLES_PER_FRAME)
         {
             uint32_t cycles = CYCLES_PER_TICK;
             
             /* Tick componets that run at EE speed */
             ee->tick(cycles);
             
-            /* Tick IOP components */
-            cycles /= 8;
-            iop->tick(cycles);
+            /* Tick bus components */
+            cycles /= 2;
+            dmac->tick(cycles);
 
-            frame_cycles -= CYCLES_PER_TICK;
+            /* Tick IOP components */
+            cycles /= 4;
+            iop->tick(cycles);
+            iop_dma->tick(cycles);
+
+            total_cycles += CYCLES_PER_TICK;
+
+            if (!vblank_started && total_cycles >= CYCLES_VBLANK_OFF)
+            {
+                vblank_started = true;
+                ee->intc.trigger(ee::Interrupt::INT_VB_ON);
+                iop->intr.trigger(iop::Interrupt::VBLANKBegin);
+            }
         }
+
+        /* VBlank end */
+        iop->intr.trigger(iop::Interrupt::VBLANKEnd);
+        ee->intc.trigger(ee::Interrupt::INT_VB_OFF);
+        vblank_started = false;
     }
 }

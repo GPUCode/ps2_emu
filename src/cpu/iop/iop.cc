@@ -1,6 +1,8 @@
 #include <cpu/iop/iop.h>
 #include <cstring>
 #include <fmt/color.h>
+#include <fstream>
+#include <sstream>
 
 #ifndef NDEBUG
 #define log(...) ((void)0)
@@ -152,7 +154,7 @@ namespace iop
     {
         /* Fetch instruction from main RAM. */
         instr = next_instr;
-
+        
         /* Detect calls to the putc function and handle them */
         if (instr.pc == 0x00012C48 || instr.pc == 0x0001420C || instr.pc == 0x0001430C)
         {
@@ -194,9 +196,9 @@ namespace iop
     {
         fmt::print("[IOP] Exception of type {:d}\n", (int)cause);
 
-        uint32_t mode = cop0.sr.value & 0x3F;
-        cop0.sr.value &= ~(uint32_t)0x3F;
-        cop0.sr.value |= (mode << 2) & 0x3F;
+        uint32_t mode = cop0.status.value & 0x3F;
+        cop0.status.value &= ~(uint32_t)0x3F;
+        cop0.status.value |= (mode << 2) & 0x3F;
         
         cop0.cause.excode = (uint32_t)cause;
         cop0.cause.CE = cop;
@@ -230,7 +232,7 @@ namespace iop
         }
 
         /* Select exception address. */
-        pc = exception_addr[cop0.sr.BEV];
+        pc = exception_addr[cop0.status.BEV];
 
         /* Bypass the pipeline and insert our instruction. */
         direct_jump();
@@ -509,7 +511,7 @@ namespace iop
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = gpr[base] + offset;
-        if (!cop0.sr.IsC)
+        if (!cop0.status.IsC)
         {
             if (vaddr & 0x1) [[unlikely]]
             {
@@ -544,7 +546,7 @@ namespace iop
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = gpr[base] + offset;
-        if (!cop0.sr.IsC) 
+        if (!cop0.status.IsC) 
         {
             if (vaddr & 0x1) [[unlikely]]
             {
@@ -562,11 +564,11 @@ namespace iop
 
     void IOProcessor::op_rfe()
     {
-        uint32_t mode = cop0.sr.value & 0x3F;
+        uint32_t mode = cop0.status.value & 0x3F;
 
         /* Shift kernel/user mode bits back. */
-        cop0.sr.value &= ~(uint32_t)0xF;
-        cop0.sr.value |= mode >> 2;
+        cop0.status.value &= ~(uint32_t)0xF;
+        cop0.status.value |= mode >> 2;
 
         log("RFE\n");
     }
@@ -753,7 +755,7 @@ namespace iop
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = gpr[base] + offset;
-        if (!cop0.sr.IsC) 
+        if (!cop0.status.IsC) 
         {
             uint32_t value = read<uint8_t>(vaddr);
             load(rt, value);
@@ -843,7 +845,7 @@ namespace iop
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = gpr[base] + offset;
-        if (!cop0.sr.IsC) 
+        if (!cop0.status.IsC) 
         {
             uint32_t value = (int8_t)read<uint8_t>(vaddr);
             load(rt, value);
@@ -869,7 +871,7 @@ namespace iop
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = gpr[base] + offset;
-        if (!cop0.sr.IsC)
+        if (!cop0.status.IsC)
         {
             write<uint8_t>(vaddr, gpr[rt]);
         }
@@ -901,7 +903,7 @@ namespace iop
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = gpr[base] + offset;
-        if (!cop0.sr.IsC) 
+        if (!cop0.status.IsC) 
         {
             if (vaddr & 0x1) [[unlikely]]
             {
@@ -947,7 +949,7 @@ namespace iop
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = gpr[base] + offset;
-        if (!cop0.sr.IsC) 
+        if (!cop0.status.IsC) 
         {
             if (vaddr & 0x3) [[unlikely]]
             {
@@ -1050,7 +1052,7 @@ namespace iop
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = gpr[base] + offset;
-        if (!cop0.sr.IsC) 
+        if (!cop0.status.IsC) 
         {
             if (vaddr & 0x3) [[unlikely]]
             {

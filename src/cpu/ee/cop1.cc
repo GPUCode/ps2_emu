@@ -8,8 +8,7 @@ namespace ee
 		uint16_t function = instr.r_type.funct;
 		switch (function)
 		{
-		case 0b011000:
-			op_adda(instr); break;
+		case 0b011000: op_adda(instr); break;
 		default:
 			fmt::print("[COP1] Unimplemented opcode: {:#08b}\n", function);
 			std::abort();
@@ -23,5 +22,9 @@ namespace ee
 
 		fmt::print("[COP1] ADDA.S: ACC = FPR[{}] ({}) + FPR[{}] ({})\n", fs, fpr[fs].fint, ft, fpr[ft].fint);
 		acc.fint = fpr[fs].fint + fpr[ft].fint;
+	}
+	
+	void COP1::op_madd(Instruction instr)
+	{
 	}
 }

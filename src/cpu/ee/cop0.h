@@ -49,8 +49,8 @@ namespace ee
             uint32_t : 2;
             uint32_t exccode : 5;
             uint32_t : 3;
-            uint32_t ip1_pending : 1;
             uint32_t ip0_pending : 1;
+            uint32_t ip1_pending : 1;
             uint32_t siop : 1;
             uint32_t : 2;
             uint32_t timer_ip_pending : 1;

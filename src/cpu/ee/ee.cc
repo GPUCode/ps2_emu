@@ -2,10 +2,11 @@
 #include <cpu/vu/vu0.h>
 #include <common/emulator.h>
 #include <fmt/color.h>
+#include <unordered_map>
 
 bool print_pc = false;
 
-#ifdef NDEBUG
+#ifndef NDEBUG
 #define log(...) (void)0
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
@@ -58,6 +59,7 @@ namespace ee
 
             /* Read next instruction */
             direct_jump();
+
             log("PC: {:#x} instruction: {:#x} ", instr.pc, instr.value);
 
             /* Skip the delay slot for any BEQ* instructions */
@@ -149,14 +151,14 @@ namespace ee
             /* Select appropriate exception vector */
             switch (exception)
             {
-            case Exception::TLBLoad: 
+            case Exception::TLBLoad:
             case Exception::TLBStore:
                 vector = ExceptionVector::V_TLB_REFILL;
                 break;
-            case Exception::Interrupt: 
+            case Exception::Interrupt:
                 vector = ExceptionVector::V_INTERRUPT;
                 break;
-            default: 
+            default:
                 vector = ExceptionVector::V_COMMON;
                 break;
             }
@@ -167,7 +169,7 @@ namespace ee
 
         /* We do this to avoid branches */
         pc = exception_addr[cop0.status.bev] + vector;
-        
+
         /* Insert the instruction in our pipeline */
         direct_jump();
     }
@@ -182,11 +184,6 @@ namespace ee
 
     void EmotionEngine::op_cop0()
     {
-        /*  The manual says that COP0 is only accessible in kernel mode
-            There are exceptions but we will deal with those later.  */
-        if (cop0.get_operating_mode() != OperatingMode::KERNEL_MODE)
-            return;
-
         uint16_t type = instr.value >> 21 & 0x1F;
         switch (type)
         {
@@ -220,6 +217,7 @@ namespace ee
             case 0b000010: op_tlbwi(); break;
             case 0b111001: op_di(); break;
             case 0b011000: op_eret(); break;
+            case 0b111000: op_ei(); break;
             default:
                 fmt::print("[ERROR] Unimplemented COP0 TLB instruction {:#08b}\n", fmt);
             }
@@ -276,6 +274,10 @@ namespace ee
         case 0b000110: op_srlv(); break;
         case 0b111110: op_dsrl32(); break;
         case 0b001100: op_syscall(); break;
+        case 0b101000: op_mfsa(); break;
+        case 0b010001: op_mthi(); break;
+        case 0b010011: op_mtlo(); break;
+        case 0b101001: op_mtsa(); break;
         default:
             fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		    std::abort();
@@ -471,14 +473,17 @@ namespace ee
 
         uint32_t vaddr = offset + gpr[base].word[0];
     
-        log("LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
         if (vaddr & 0x7) [[unlikely]]
         {
             log("[ERROR] LD: Address {:#x} is not aligned\n", vaddr);
             exception(Exception::AddrErrorLoad);
         }
         else
+        {
             gpr[rt].dword[0] = read<uint64_t>(vaddr);
+            log("LD: GPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
+        }
+
     }
 
     void EmotionEngine::op_j()
@@ -1003,22 +1008,31 @@ namespace ee
         log("DSRL32: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].dword[0], sa);
     }
 
+    /* Syscall names per id. Info from ps2devwiki */
+    std::unordered_map<uint16_t, std::string> syscalls =
+    {
+        { 0x5, "_ExceptionEpilogue" },
+        { 0x12, "AddDmacHandler" },
+        { 0x16, "_EnableDmac" },
+        { 0x3c, "InitMainThread" },
+        { 0x3d, "InitHeap" },
+        { 0x40, "CreateSema" },
+        { 0x44, "WaitSema" },
+        { 0x64, "FlushCache" },
+        { 0x77, "SifSetDma" },
+        { 0x79, "sceSifSetReg" },
+        { 0x7a, "sceSifGetReg" },
+        { 0x7c, "Deci2Call" }
+    };
+
     void EmotionEngine::op_syscall()
     {
-        static char syscall[30] = "syscall";
-        
-        uint32_t id = gpr[3].word[0];
-        switch (id)
-        {
-        case 0x16: fmt::print("[EE] Executing _EnableDmac with id 0x16\n"); break;
-        case 0x12: fmt::print("[EE] Executing AddDmacHandler with id 0x12\n"); break;
-        case 0x3c: fmt::print("[EE] Executing InitMainThread with id 0x3c\n"); break;
-        case 0x3d: fmt::print("[EE] Executing InitHeap with id 0x3d\n"); break;
-        case 0x64: fmt::print("[EE] Executing FlushCache with id 0x64\n"); break;
-        case 0x77: fmt::print("[EE] Executing SifSetDma with id 0x77\n"); break;
-        case 0x7c: fmt::print("[EE] Executing Deci2Call with id 0x7c\n"); break;
-        }
+        int8_t code = read<uint8_t>(instr.pc - 4);
+        /* Negative syscalls also exist! */
+        uint16_t id = std::abs(code);
+        fmt::print("[EE] Executing {} with id {:#x}\n", syscalls[id], id);
 
+        log("SYSCALL: {:#x}\n", id);
         exception(Exception::Syscall, false);
     }
 
@@ -1054,6 +1068,38 @@ namespace ee
         log("BGEZL: IF GPR[{:d}] ({:#x}) >= 0 THEN PC += {:#x}\n", rs, reg, offset);
     }
 
+    void EmotionEngine::op_mfsa()
+    {
+        uint16_t rd = instr.r_type.rd;
+        gpr[rd].dword[0] = sa;
+
+        log("MFSA\n");
+    }
+
+    void EmotionEngine::op_mthi()
+    {
+        uint16_t rs = instr.i_type.rs;
+        hi0 = gpr[rs].dword[0];
+
+        log("MTHI: HI0 = GPR[{}] = {:#x}\n", rs, hi0);
+    }
+
+    void EmotionEngine::op_mtlo()
+    {
+        uint16_t rs = instr.i_type.rs;
+        lo0 = gpr[rs].dword[0];
+
+        log("MTLO: LO0 = GPR[{}] = {:#x}\n", rs, lo0);
+    }
+
+    void EmotionEngine::op_mtsa()
+    {
+        uint16_t rs = instr.i_type.rs;
+        sa = gpr[rs].dword[0];
+
+        log("MTSA: SA = GPR[{}] = {:#x}\n", rs, sa);
+    }
+
     void EmotionEngine::op_di()
     {
         auto& status = cop0.status;
@@ -1084,17 +1130,26 @@ namespace ee
         direct_jump();
     }
 
+    void EmotionEngine::op_ei()
+    {
+        auto& status = cop0.status;
+        if (status.edi || status.exl || status.erl || !status.ksu)
+        {
+            status.eie = 1;
+        }
+
+        log("EI: STATUS.EIE = {:d}\n", (uint16_t)status.eie);
+    }
+
     void EmotionEngine::op_cop1()
     {
         uint32_t fmt = (instr.value >> 21) & 0x1f;
         switch (fmt)
         {
-        case 0b00100:
-            op_mtc1(); break;
-        case 0b00110:
-            op_ctc1(); break;
-        case 0b10000:
-            cop1.execute(instr); break;
+        case 0b00100: op_mtc1(); break;
+        case 0b00110: op_ctc1(); break;
+        case 0b00010: op_cfc1(); break;
+        case 0b10000: cop1.execute(instr); break;
         default:
             fmt::print("[ERROR] Unimplemented COP1 instruction {:#07b}\n", fmt);
             std::abort();
@@ -1115,11 +1170,24 @@ namespace ee
         uint16_t fs = instr.r_type.rd;
         uint16_t rt = instr.r_type.rt;
 
-        fmt::print("[COP1] CTC1: FCR{} = GPR[{}] = ({:#x})\n", fs, rt, gpr[rt].word[0]);
+        log("[COP1] CTC1: FCR{} = GPR[{}] = ({:#x})\n", fs, rt, gpr[rt].word[0]);
         switch (fs)
         {
         case 0: cop1.fcr0.value = gpr[rt].word[0]; break;
         case 31: cop1.fcr31.value = gpr[rt].word[0]; break;
+        }
+    }
+
+    void EmotionEngine::op_cfc1()
+    {
+        uint16_t fs = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+        
+        log("[COP1] CFC1: GPR[{}] = FCR{}\n", rt, fs);
+        switch (fs)
+        {
+        case 0: gpr[rt].dword[0] = (int32_t)cop1.fcr0.value; break;
+        case 31: gpr[rt].dword[0] = (int32_t)cop1.fcr31.value; break;
         }
     }
 
@@ -1172,6 +1240,54 @@ namespace ee
         }
 
         log("PADDUW: GPR[{}] = GPR[{}] + GPR[{}]\n", rd, rs, rt);
+    }
+
+    void EmotionEngine::op_plzcw()
+    {
+        uint16_t rd = instr.r_type.rd;
+        uint64_t rs = instr.r_type.rs;
+
+        for (int i = 0; i < 2; i++)
+        {
+            auto word = gpr[rs].word[i];
+            bool high_bit = word & (1 << 31);
+            uint8_t bits = 0;
+            for (int j = 30; j >= 0; j--)
+            {
+                if ((word & (1 << j)) == (high_bit << j))
+                    bits++;
+                else
+                    break;
+            }
+            
+            gpr[rd].word[i] = bits;
+        }
+
+        log("PLZCW\n");
+    }
+
+    void EmotionEngine::op_mfhi1()
+    {
+        uint16_t rd = instr.r_type.rd;
+        gpr[rd].dword[0] = hi1;
+
+        log("MFHI1: GPR[{}] = HI1 = {:#x}\n", rd, hi1);
+    }
+
+    void EmotionEngine::op_mthi1()
+    {
+        uint16_t rs = instr.r_type.rs;
+        hi1 = gpr[rs].dword[0];
+
+        log("MTHI1: HI1 = GPR[{}] = {:#x}\n", rs, hi1);
+    }
+
+    void EmotionEngine::op_mtlo1()
+    {
+        uint16_t rs = instr.r_type.rs;
+        lo1 = gpr[rs].dword[0];
+
+        log("MTLO1: LO1 = GPR[{}] = {:#x}\n", rs, hi1);
     }
 
     void EmotionEngine::op_dsrav()
@@ -1282,6 +1398,10 @@ namespace ee
         case 0b011011: op_divu1(); break;
         case 0b010010: op_mflo1(); break;
         case 0b011000: op_mult1(); break;
+        case 0b000100: op_plzcw(); break;
+        case 0b010000: op_mfhi1(); break;
+        case 0b010001: op_mthi1(); break;
+        case 0b010011: op_mtlo1(); break;
         case 0b101001:
         {
             switch (instr.r_type.sa)

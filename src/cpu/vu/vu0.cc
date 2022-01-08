@@ -142,6 +142,10 @@ namespace vu
 		uint32_t address = regs.vi[it] * 16;
 		auto ptr = (uint32_t*)&data[address];
 
+		/* HACK */
+		if (address > 0xff0)
+			return;
+
 		fmt::print("[VU0] VSQI Writing VF[{}] = {:#x} to address {:#x} (", fs, (uint64_t)regs.vf[fs].qword, address);
 		for (int i = 0; i < 4; i++)
 		{

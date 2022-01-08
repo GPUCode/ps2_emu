@@ -1,5 +1,6 @@
 #pragma once
 #include <common/component.h>
+#include <queue>
 
 namespace common
 {
@@ -25,5 +26,9 @@ namespace common
 	private:
 		Emulator* emulator;
 		SIFRegs regs = {};
+
+	public:
+		/* Used by the DMA controllers of each component */
+		std::queue<uint32_t> sif0_fifo, sif1_fifo;
 	};
 }

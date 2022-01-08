@@ -13,11 +13,15 @@ namespace iop
 	{
 		uint32_t offset = (addr & 0xf) >> 2;
 		auto ptr = (uint32_t*)&regs + offset;
+		auto value = *ptr;
 
-		if (offset == 2) /* Reading I_CTRL returns AND clears it */
+		/* Reading I_CTRL returns AND clears it */
+		if (offset == 2)
+		{
 			regs.i_ctrl = 0;
+		}
 
-		return *ptr;
+		return value;
 	}
 
 	void INTR::write(uint32_t addr, uint64_t data)
@@ -39,11 +43,12 @@ namespace iop
 	{
 		auto& cop0 = iop->cop0;
 		
-		/* If !I_CTRL && (I_STAT & I_MASK), then COP0.Cause:8 is set */
-		bool pending = !regs.i_ctrl && (regs.i_stat & regs.i_mask);
+		/* If I_CTRL && (I_STAT & I_MASK), then COP0.Cause:8 is set */
+		/* NOTE: ps2tek says !I_CTRL but apparently that's wrong */
+		bool pending = regs.i_ctrl && (regs.i_stat & regs.i_mask);
 		cop0.cause.IP = (cop0.cause.IP & ~0x4) | (pending << 2);
 		
-		bool enabled = cop0.sr.IEc && (cop0.sr.Im & cop0.cause.IP);
+		bool enabled = cop0.status.IEc && (cop0.status.Im & cop0.cause.IP);
 		return pending && enabled;
 	}
 }

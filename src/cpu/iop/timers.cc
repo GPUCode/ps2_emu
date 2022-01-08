@@ -46,10 +46,11 @@ namespace iop
 	uint32_t Timers::read(uint32_t address)
 	{
 		bool group = address & 0x400;
-		uint32_t timer = (address & 0x30) >> 4;
+		uint32_t timer = ((address & 0x30) >> 4) + 3 * group;
 		uint32_t offset = (address & 0xf) >> 2;
 
-		auto ptr = (uint64_t*)&timers[timer + 3 * group] + offset;
+		auto ptr = (uint64_t*)&timers[timer] + offset;
+		auto value = *ptr;
 		if (offset == 1) /* Reads from mode clear the two raised interrupt flags */
 		{
 			TimerMode& mode = timers[timer].mode;
@@ -57,20 +58,18 @@ namespace iop
 			mode.overflow_intr_raised = false;
 		}
 
-		fmt::print("[IOP TIMERS] Reading {:#x} from timer {:d} at offset {:#x}\n", *ptr, timer + 3 * group, offset << 2);
-
-		return *ptr;
+		fmt::print("[IOP TIMERS] Reading {:#x} from timer {:d} at offset {:#x}\n", *ptr, timer, offset << 2);
+		return value;
 	}
 	
 	void Timers::write(uint32_t address, uint32_t data)
 	{
 		bool group = address & 0x400;
-		uint32_t timer = (address & 0x30) >> 4;
+		uint32_t timer = ((address & 0x30) >> 4) + 3 * group;
 		uint32_t offset = (address & 0xf) >> 2;
+		auto ptr = (uint64_t*)&timers[timer] + offset;
+		*ptr = data;
 
-		fmt::print("[IOP TIMERS] Writing {:#x} to timer {:d} at offset {:#x}\n", data, timer + 3 * group, offset << 2);
-
-		auto ptr = (uint64_t*)&timers[timer + 3 * group] + offset;
 		switch (offset)
 		{
 		case 1: /* Writes to mode reset the counter to zero and set bit 10 to 1 */
@@ -88,6 +87,6 @@ namespace iop
 		}
 		}
 
-		*ptr = data;
+		fmt::print("[IOP TIMERS] Writing {:#x} to timer {:d} at offset {:#x}\n", data, timer, offset << 2);
 	}
 }
