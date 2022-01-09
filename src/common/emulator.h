@@ -46,7 +46,7 @@ namespace common
         /* KSEG1: Strip the 3 MSB's (0xA -> 0x0 and 0xB -> 0x1) */
         0x1fffffff,
         /* KSEG2: Don't touch the address, it's fine */
-        0xffffffff, 0xffffffff,
+        0xffffffff, 0x1fffffff,
     };
 
     /* These were measured from my PAL PS2 Slim and more specifically:
@@ -152,6 +152,10 @@ namespace common
         if (paddr >= 0x11000000 && paddr < 0x11008000)
         {
             vu0->write(paddr, data);
+        }
+        else if (paddr >= 0x1fff8000 && paddr < 0x20000000)
+        {
+            *(T*)&bios[paddr & 0x3fffff] = data;
         }
         else
         {

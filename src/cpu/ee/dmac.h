@@ -27,9 +27,9 @@ namespace ee
 		struct
 		{
 			uint128_t qwords : 16;
-			uint128_t : 11;
+			uint128_t : 10;
 			uint128_t priority : 2;
-			uint128_t id : 2;
+			uint128_t id : 3;
 			uint128_t irq : 1;
 			uint128_t address : 31;
 			uint128_t mem_select : 1;

@@ -275,21 +275,10 @@ namespace ee
 				/* Update channel from tag */
 				channel.qword_count = tag.qwords;
 				channel.control.tag = (tag.value >> 16) & 0xffff;
+				channel.address = tag.address;
 				channel.tag_address.address += 16;
 
-				uint16_t tag_id = tag.id;
-				switch (tag_id)
-				{
-				case 0:
-				{
-					/* MADR=DMAtag.ADDR */
-					channel.address = tag.address;
-					break;
-				}
-				default:
-					fmt::print("\n[DMAC] Unrecognized SIF0 DMAtag id {:d}\n", tag_id);
-					std::abort();
-				}
+				fmt::print("[DMAC] QWC: {:d}\nADDR: {:#x}\n", channel.qword_count, channel.address);
 
 				if (channel.control.enable_irq_bit && tag.irq)
 				{
@@ -323,6 +312,14 @@ namespace ee
 				channel.address = tag.address;
 				channel.tag_address.address += 16;
 				channel.end_transfer = true;
+				break;
+			}
+			case DMASourceID::REF:
+			{
+				/* MADR=DMAtag.ADDR
+				   TADR+=16 */
+				channel.address = tag.address;
+				channel.tag_address.address += 16;
 				break;
 			}
 			default:

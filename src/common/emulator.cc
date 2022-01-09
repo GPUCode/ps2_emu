@@ -62,8 +62,8 @@ namespace common
 
     const uint32_t Emulator::calculate_page(const uint32_t addr)
     {
-        /* Ensure that byte is 0 for everything! (exclude 0xfffe* addresses) */
-        assert((addr & 0x000f0000) == 0 || (addr & 0xffff0000) == 0xfffe0000);
+        /* Ensure that byte is 0 for everything! (exclude 0x1ffe* addresses) */
+        assert((addr & 0x000f0000) == 0 || (addr & 0x1fff0000) == 0x1ffe0000);
 
         /* Optimize our address to shrink our handler array size */
         uint32_t opt_addr = ((addr & 0x0ff00000) >> 4) | (addr & 0xfffff);

@@ -100,7 +100,10 @@ namespace iop
 
         /* Execute pending interrupts */
         if (intr.interrupt_pending())
+        {
+            fmt::print("[IOP] Triggering interrupt!\n");
             exception(Exception::Interrupt);
+        }
     }
 
     void IOProcessor::op_special()

@@ -62,21 +62,30 @@ namespace iop
 			auto ptr = (uint32_t*)&globals + offset;
 			fmt::print("[IOP DMA] Writing {:#x} to {}\n", data, GLOBALS[offset]);
 
-			*ptr = data;
-
 			/* Handle special case for writing to DICR */
 			if (offset == 1)
 			{
 				auto& irq = globals.dicr;
+				auto flags = irq.flags;
+				
 				/* Writing 1 to the interrupt flags clears them */
-				irq.flags &= ~((data >> 24) & 0x7f);
+				irq.value = data;
+				irq.flags = flags & ~((data >> 24) & 0x7f);
 				/* Update master interrupt flag */
 				irq.master_flag = irq.force || (irq.master_enable && ((irq.enable & irq.flags) > 0));
 			}
 			else if (offset == 3)
 			{
 				auto& irq = globals.dicr2;
-				irq.flags &= ~((data >> 24) & 0x7f);
+				auto flags = irq.flags;
+
+				/* Writing 1 to the interrupt flags clears them */
+				irq.value = data;
+				irq.flags = flags & ~((data >> 24) & 0x7f);
+			}
+			else
+			{
+				*ptr = data;
 			}
 		}
 		else /* Write channels */
@@ -87,6 +96,11 @@ namespace iop
 			
 			fmt::print("[IOP DMA] Writing {:#x} to {} of channel {:d}\n", data, REGS[offset], channel);
 			*ptr = data;
+
+			if (channels[channel].control.running)
+			{
+				fmt::print("\n[IOP DMA] Started transfer on channel {:d}\n", channel);
+			}
 		}
 	}
 
@@ -207,7 +221,7 @@ namespace iop
 		{
 			auto& sif = emulator->sif;
 			/* Only read if the fifo has data in it */
-			if (sif->sif1_fifo.size() >= 2)
+			if (sif->sif1_fifo.size() >= 4)
 			{
 				uint32_t data[2];
 				for (int i = 0; i < 2; i++)
@@ -216,6 +230,8 @@ namespace iop
 					sif->sif1_fifo.pop();
 				}
 
+				/* The EE always sends qwords (4 bytes). Because our tag 
+				   is 2 bytes the rest is just padding */
 				sif->sif1_fifo.pop();
 				sif->sif1_fifo.pop();
 

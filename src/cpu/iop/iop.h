@@ -183,7 +183,7 @@ namespace iop
             return intr.read(paddr);
         case 0x1f801450:
         case 0x1f801578:
-        case 0xfffe0130: /* Cache control */
+        case 0x1ffe0130: /* Cache control */
             return 0;
         default:
             return emulator->read<T, common::ComponentID::IOP>(paddr);
@@ -208,7 +208,7 @@ namespace iop
             return timers.write(paddr, data);
         case 0x1f801578: /* These just causes too much logspam */
         case 0x1f801450:
-        case 0xfffe0130:
+        case 0x1ffe0130:
             return;
         default:
             emulator->write<T, common::ComponentID::IOP>(paddr, data);

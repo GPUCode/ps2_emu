@@ -114,6 +114,7 @@ namespace ee
             case 0b011011: op_ldr(); break;
             case 0b101100: op_sdl(); break;
             case 0b101101: op_sdr(); break;
+            case 0b110001: op_lwc1(); break;
             default:
                 fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
                 std::abort();
@@ -278,6 +279,7 @@ namespace ee
         case 0b010001: op_mthi(); break;
         case 0b010011: op_mtlo(); break;
         case 0b101001: op_mtsa(); break;
+        case 0b101111: op_dsubu(); break;
         default:
             fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		    std::abort();
@@ -1017,9 +1019,11 @@ namespace ee
         { 0x3c, "InitMainThread" },
         { 0x3d, "InitHeap" },
         { 0x40, "CreateSema" },
+        { 0x43, "iSignalSema" },
         { 0x44, "WaitSema" },
         { 0x64, "FlushCache" },
         { 0x77, "SifSetDma" },
+        { 0x78, "sceSifSetDChain" },
         { 0x79, "sceSifSetReg" },
         { 0x7a, "sceSifGetReg" },
         { 0x7c, "Deci2Call" }
@@ -1098,6 +1102,35 @@ namespace ee
         sa = gpr[rs].dword[0];
 
         log("MTSA: SA = GPR[{}] = {:#x}\n", rs, sa);
+    }
+
+    void EmotionEngine::op_lwc1()
+    {
+        uint16_t base = instr.i_type.rs;
+        uint16_t ft = instr.i_type.rt;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        uint32_t vaddr = offset + gpr[base].word[0];
+        if (vaddr & 0x3) [[unlikely]]
+        {
+            log("[ERROR] LWC1: Address {:#x} is not aligned\n", vaddr);
+            exception(Exception::AddrErrorLoad);
+        }
+        else
+        {
+            cop1.fpr[ft].uint = read<uint32_t>(vaddr);
+            log("LWC1: FPR[{:d}] = {:#x} from address {:#x} = GPR[{:d}] ({:#x}) + {:#x}\n", ft, cop1.fpr[ft].uint, vaddr, base, gpr[base].word[0], offset);
+        }
+    }
+
+    void EmotionEngine::op_dsubu()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+        
+        gpr[rd].dword[0] = gpr[rs].dword[0] - gpr[rt].dword[0];
+        log("DSUBU: GPR[{}] = GPR[{}] ({:#x}) - GPR[{}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
     }
 
     void EmotionEngine::op_di()
