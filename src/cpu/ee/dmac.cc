@@ -310,8 +310,14 @@ namespace ee
 				   TADR+=16
 				   tag_end=true */
 				channel.address = tag.address;
-				channel.tag_address.address += 16;
+				channel.tag_address.value += 16;
 				channel.end_transfer = true;
+				break;
+			}
+			case DMASourceID::NEXT:
+			{
+				channel.address = channel.tag_address.address + 16;
+				channel.tag_address.value = tag.address;
 				break;
 			}
 			case DMASourceID::REF:
@@ -319,13 +325,15 @@ namespace ee
 				/* MADR=DMAtag.ADDR
 				   TADR+=16 */
 				channel.address = tag.address;
-				channel.tag_address.address += 16;
+				channel.tag_address.value += 16;
 				break;
 			}
 			default:
 				fmt::print("\n[DMAC] Unrecognized SIF1 DMAtag id {:d}\n", tag_id);
 				std::abort();
 			}
+
+			assert(channel.tag_address.mem_select == 0);
 
 			if (channel.control.enable_irq_bit && tag.irq)
 			{

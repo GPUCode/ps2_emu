@@ -28,6 +28,7 @@ add_executable(${PROJECT_NAME}
 	"src/media/ipu.cc"
 	"src/cpu/ee/cop1.cc"
 	"src/common/sif.cc"
+	"src/spu/spu.cc"
 )
 
 # Link to all the required conan libs

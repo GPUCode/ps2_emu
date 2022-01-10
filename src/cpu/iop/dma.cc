@@ -2,6 +2,7 @@
 #include <common/emulator.h>
 #include <cpu/iop/iop.h>
 #include <common/sif.h>
+#include <spu/spu.h>
 #include <fmt/color.h>
 #include <cassert>
 
@@ -122,6 +123,11 @@ namespace iop
 					{
 						switch (id)
 						{
+						case DMAChannels::SPU2:
+						{
+							channel.block_conf.count--;
+							break;
+						}
 						case DMAChannels::SIF0:
 						{
 							auto& sif = emulator->sif;
@@ -153,6 +159,12 @@ namespace iop
 					}
 					else if (channel.end_transfer)
 					{
+						/* HACK: Trigger interrupt when SPU transfers */
+						if (id == DMAChannels::SPU2)
+						{
+							emulator->spu2->trigger_irq();
+						}
+
 						channel.control.running = 0;
 						channel.end_transfer = false;
 						globals.dicr2.flags |= (1 << (id - 7));
@@ -180,6 +192,15 @@ namespace iop
 		uint32_t* data;
 		switch (id)
 		{
+		case DMAChannels::SPU2:
+		{
+			/* If chain mode is requested, I want to be notified */
+			assert(channel.control.transfer_mode == 1);
+			channel.end_transfer = true;
+
+			/* Do nothing */
+			break;
+		}
 		case DMAChannels::SIF0:
 		{
 			auto& sif = emulator->sif;

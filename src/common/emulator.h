@@ -35,6 +35,11 @@ namespace media
     struct IPU;
 }
 
+namespace spu
+{
+    struct SPU;
+}
+
 namespace common
 {
     constexpr uint32_t KUSEG_MASKS[8] = 
@@ -104,6 +109,7 @@ namespace common
         std::unique_ptr<vu::VIF> vif;
         std::unique_ptr<media::IPU> ipu;
         std::unique_ptr<common::SIF> sif;
+        std::unique_ptr<spu::SPU> spu2;
 
         /* Memory - Registers */
         uint8_t* bios;
