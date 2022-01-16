@@ -11,6 +11,8 @@
 #include <gs/gs.h>
 #include <media/ipu.h>
 #include <spu/spu.h>
+#include <media/cdvd.h>
+#include <media/sio2.h>
 #include <cassert>
 
 int cycles_executed = 0;
@@ -38,6 +40,8 @@ namespace common
         ipu = std::make_unique<media::IPU>(this);
         sif = std::make_unique<common::SIF>(this);
         spu2 = std::make_unique<spu::SPU>(this);
+        cdvd = std::make_unique<media::CDVD>(this);
+        sio2 = std::make_unique<media::SIO2>(this);
 
         /* Initialize console */
         console.open("console.txt", std::ios::out);

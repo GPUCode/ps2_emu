@@ -59,6 +59,7 @@ namespace ee
         uint128_t qword;
         uint64_t dword[2];
         uint32_t word[4];
+        uint16_t hword[8];
         uint8_t byte[16];
     };
 
@@ -130,7 +131,7 @@ namespace ee
         void op_sdr(); void op_dsrl(); void op_srlv(); void op_dsrl32();
         void op_syscall(); void op_bltzl(); void op_bgezl(); void op_mfsa();
         void op_mthi(); void op_mtlo(); void op_mtsa(); void op_lwc1();
-        void op_dsubu();
+        void op_dsubu(); void op_blezl(); void op_xor(); void op_multu();
 
         /* COP0 instructions */
         void op_di(); void op_eret(); void op_ei();
@@ -146,6 +147,8 @@ namespace ee
 
         /* MMI instructions */
         void op_plzcw(); void op_mfhi1(); void op_mthi1(); void op_mtlo1();
+        void op_pcpyh(); void op_pcpyld(); void op_pnor(); void op_psubb();
+        void op_pand(); void op_pcpyud(); void op_pxor();
 
         /* Registers. */
         Register gpr[32] = {};
@@ -172,11 +175,12 @@ namespace ee
         INTC intc;
         Timers timers;
 
-    protected:
-        common::Emulator* emulator;
-
         /* Logging */
         std::FILE* disassembly;
+        bool print_pc = false;
+
+    protected:
+        common::Emulator* emulator;
     };
 
     template <typename T>

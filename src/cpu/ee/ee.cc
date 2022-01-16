@@ -4,8 +4,6 @@
 #include <fmt/color.h>
 #include <unordered_map>
 
-bool print_pc = false;
-
 #ifndef NDEBUG
 #define log(...) (void)0
 #else
@@ -115,11 +113,16 @@ namespace ee
             case 0b101100: op_sdl(); break;
             case 0b101101: op_sdr(); break;
             case 0b110001: op_lwc1(); break;
+            case 0b010110: op_blezl(); break;
             default:
                 fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
                 std::abort();
             }
         }
+
+        /* Sometimes an instruction might write to GPR[0].
+           To avoid branches, reset the register each time */
+        gpr[0].qword = 0;
 
         /* Increment COP0 counter */
         cop0.count += cycles;
@@ -280,6 +283,8 @@ namespace ee
         case 0b010011: op_mtlo(); break;
         case 0b101001: op_mtsa(); break;
         case 0b101111: op_dsubu(); break;
+        case 0b100110: op_xor(); break;
+        case 0b011001: op_multu(); break;
         default:
             fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		    std::abort();
@@ -696,7 +701,7 @@ namespace ee
         hi0 = (int64_t)(int32_t)(result >> 32);
         gpr[rd].dword[0] = (int64_t)lo0;
 
-        //log("MADD: GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", lo0, hi0);
+        log("MADD: GPR[{:d}] = LO0 = {:#x} and HI0 = {:#x}\n", rd, lo0, hi0);
     }
 
     void EmotionEngine::op_divu1()
@@ -1133,6 +1138,45 @@ namespace ee
         log("DSUBU: GPR[{}] = GPR[{}] ({:#x}) - GPR[{}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
     }
 
+    void EmotionEngine::op_blezl()
+    {
+        int32_t imm = (int16_t)instr.i_type.immediate;
+        uint16_t rs = instr.i_type.rs;
+
+        int32_t offset = imm << 2;
+        int64_t reg = gpr[rs].dword[0];
+        if (reg <= 0)
+            pc += offset - 4;
+        else
+            skip_branch_delay = true;
+
+        next_instr.is_delay_slot = !skip_branch_delay;
+        log("BLEZL: IF GPR[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
+    }
+
+    void EmotionEngine::op_xor()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        gpr[rd].dword[0] = gpr[rs].dword[0] ^ gpr[rt].dword[0];
+        log("XOR: GPR[{}] = GPR[{}] ({:#x}) ^ GPR[{}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+    }
+
+    void EmotionEngine::op_multu()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        uint64_t result = (uint64_t)gpr[rs].word[0] * gpr[rt].word[0];
+        gpr[rd].dword[0] = lo0 = result & 0xFFFFFFFF;
+        hi0 = result >> 32;
+        
+        log("MULTU\n");
+    }
+
     void EmotionEngine::op_di()
     {
         auto& status = cop0.status;
@@ -1319,6 +1363,94 @@ namespace ee
         log("MTLO1: LO1 = GPR[{}] = {:#x}\n", rs, hi1);
     }
 
+    void EmotionEngine::op_pcpyh()
+    {
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        for (int i = 0; i < 4; i++)
+        {
+            gpr[rd].hword[i] = gpr[rt].hword[0];
+            gpr[rd].hword[i + 4] = gpr[rt].hword[4];
+        }
+
+        log("PCPYH: GPR[{}] <- GPR[{}]\n", rd, rt);
+    }
+
+    void EmotionEngine::op_pcpyld()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        gpr[rd].dword[0] = gpr[rt].dword[0];
+        gpr[rd].dword[1] = gpr[rs].dword[0];
+
+        log("PCPYLD: GPR[{}] = {:#x}{:016x} (GPR[{}], GPR[{}])\n", rd, gpr[rd].dword[0], gpr[rd].dword[1], rt, rs);
+    }
+
+    void EmotionEngine::op_pnor()
+    {
+        uint16_t rt = instr.r_type.rt;
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+
+        log("PNOR: GPR[{:d}] = GPR[{:d}] ({:#x}) NOR GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
+
+        gpr[rd].dword[0] = ~(gpr[rs].dword[0] | gpr[rt].dword[0]);
+        gpr[rd].dword[1] = ~(gpr[rs].dword[1] | gpr[rt].dword[1]);
+    }
+
+    void EmotionEngine::op_psubb()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        for (int i = 0; i < 16; i++)
+        {
+            gpr[rd].byte[i] = (int8_t)gpr[rs].byte[i] - (int8_t)gpr[rt].byte[i];
+        }
+
+        log("PSUBB\n");
+    }
+
+    void EmotionEngine::op_pand()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        gpr[rd].dword[0] = gpr[rs].dword[0] & gpr[rt].dword[0];
+        gpr[rd].dword[1] = gpr[rs].dword[1] & gpr[rt].dword[1];
+
+        log("PAND\n");
+    }
+
+    void EmotionEngine::op_pcpyud()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        gpr[rd].dword[0] = gpr[rs].dword[1];
+        gpr[rd].dword[1] = gpr[rt].dword[1];
+
+        log("PCPYUD\n");
+    }
+
+    void EmotionEngine::op_pxor()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        gpr[rd].dword[0] = gpr[rs].dword[0] ^ gpr[rt].dword[0];
+        gpr[rd].dword[1] = gpr[rs].dword[1] ^ gpr[rt].dword[1];
+
+        log("PXOR\n");
+    }
+
     void EmotionEngine::op_dsrav()
     {
         uint16_t rs = instr.r_type.rs;
@@ -1436,8 +1568,22 @@ namespace ee
             switch (instr.r_type.sa)
             {
             case 0b10010: op_por(); break;
+            case 0b11011: op_pcpyh(); break;
+            case 0b10011: op_pnor(); break;
+            case 0b01110: op_pcpyud(); break;
             default:
                 fmt::print("[ERROR] Unimplemented MMI3 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
+                std::abort();
+            }
+            break;
+        }
+        case 0b001000:
+        {
+            switch (instr.r_type.sa)
+            {
+            case 0b01001: op_psubb(); break;
+            default:
+                fmt::print("[ERROR] Unimplemented MMI0 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
                 std::abort();
             }
             break;
@@ -1449,6 +1595,19 @@ namespace ee
             case 0b10000: op_padduw(); break;
             default:
                 fmt::print("[ERROR] Unimplemented MMI1 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
+                std::abort();
+            }
+            break;
+        }
+        case 0b001001:
+        {
+            switch (instr.r_type.sa)
+            {
+            case 0b01110: op_pcpyld(); break;
+            case 0b10010: op_pand(); break;
+            case 0b10011: op_pxor(); break;
+            default:
+                fmt::print("[ERROR] Unimplemented MMI2 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
                 std::abort();
             }
             break;

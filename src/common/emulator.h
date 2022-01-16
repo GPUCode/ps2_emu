@@ -33,6 +33,8 @@ namespace vu
 namespace media
 {
     struct IPU;
+    struct CDVD;
+    struct SIO2;
 }
 
 namespace spu
@@ -110,6 +112,8 @@ namespace common
         std::unique_ptr<media::IPU> ipu;
         std::unique_ptr<common::SIF> sif;
         std::unique_ptr<spu::SPU> spu2;
+        std::unique_ptr<media::CDVD> cdvd;
+        std::unique_ptr<media::SIO2> sio2;
 
         /* Memory - Registers */
         uint8_t* bios;

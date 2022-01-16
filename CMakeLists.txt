@@ -29,6 +29,9 @@ add_executable(${PROJECT_NAME}
 	"src/cpu/ee/cop1.cc"
 	"src/common/sif.cc"
 	"src/spu/spu.cc"
+	"src/media/cdvd.cc"
+	"src/media/sio2.cc"
+	"src/media/gamepad.cc"
 )
 
 # Link to all the required conan libs

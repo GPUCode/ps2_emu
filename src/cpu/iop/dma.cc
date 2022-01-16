@@ -3,6 +3,7 @@
 #include <cpu/iop/iop.h>
 #include <common/sif.h>
 #include <spu/spu.h>
+#include <media/sio2.h>
 #include <fmt/color.h>
 #include <cassert>
 
@@ -150,6 +151,43 @@ namespace iop
 								channel.address += 4;
 								channel.block_conf.count--;
 							}
+							break;
+						}
+						case DMAChannels::SIO2in:
+						{
+							auto& sio2 = emulator->sio2;
+							auto bytes = /*channel.block_conf.count * channel.block_conf.size */ 4;
+							for (int i = 0; i < bytes; i++)
+							{
+								uint8_t cmd = emulator->iop->ram[channel.address + i];
+								sio2->upload_command(cmd);
+							}
+
+							channel.address += bytes;
+							channel.block_conf.count--;
+							if (channel.block_conf.count == 0)
+							{
+								channel.end_transfer = true;
+							}
+
+							break;
+						}
+						case DMAChannels::SIO2out:
+						{
+							auto& sio2 = emulator->sio2;
+							auto bytes = /*channel.block_conf.count * channel.block_conf.size */ 4;
+							for (int i = 0; i < bytes; i++)
+							{
+								emulator->iop->ram[channel.address + i] = sio2->read_fifo();
+							}
+
+							channel.address += bytes;
+							channel.block_conf.count--;
+							if (channel.block_conf.count == 0)
+							{
+								channel.end_transfer = true;
+							}
+
 							break;
 						}
 						default:

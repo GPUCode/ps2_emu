@@ -1,6 +1,7 @@
 #include <cpu/ee/dmac.h>
 #include <common/emulator.h>
 #include <cpu/ee/ee.h>
+#include <cpu/iop/iop.h>
 #include <common/sif.h>
 #include <cassert>
 
