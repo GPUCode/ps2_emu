@@ -114,15 +114,20 @@ namespace ee
             case 0b101101: op_sdr(); break;
             case 0b110001: op_lwc1(); break;
             case 0b010110: op_blezl(); break;
+            case 0b100010: op_lwl(); break;
+            case 0b100110: op_lwr(); break;
+            case 0b101010: op_swl(); break;
+            case 0b101110: op_swr(); break;
+            case 0b111110: op_sqc2(); break;
             default:
                 fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
                 std::abort();
             }
-        }
 
-        /* Sometimes an instruction might write to GPR[0].
-           To avoid branches, reset the register each time */
-        gpr[0].qword = 0;
+            /* Sometimes an instruction might write to GPR[0].
+               To avoid branches, reset the register each time */
+            gpr[0].qword = 0;
+        }
 
         /* Increment COP0 counter */
         cop0.count += cycles;
@@ -285,6 +290,7 @@ namespace ee
         case 0b101111: op_dsubu(); break;
         case 0b100110: op_xor(); break;
         case 0b011001: op_multu(); break;
+        case 0b111011: op_dsra(); break;
         default:
             fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
 		    std::abort();
@@ -1175,6 +1181,110 @@ namespace ee
         hi0 = result >> 32;
         
         log("MULTU\n");
+    }
+
+    void EmotionEngine::op_lwl()
+    {
+        static const uint32_t LWL_MASK[4] = { 0xffffff, 0x0000ffff, 0x000000ff, 0x00000000 };
+        static const uint8_t LWL_SHIFT[4] = { 24, 16, 8, 0 };
+
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        uint32_t vaddr = offset + gpr[base].word[0];
+        uint32_t aligned_addr = vaddr & ~0x3;
+        int shift = vaddr & 0x3;
+
+        uint32_t data = read<uint32_t>(aligned_addr);
+        uint32_t result = (gpr[rt].word[0] & LWL_MASK[shift]) | (data << LWL_SHIFT[shift]);
+        gpr[rt].dword[0] = (int32_t)result;
+
+        log("LWL: GPR[{}] = {:#x} from address {:#x}\n", rt, gpr[rt].dword[0], vaddr);
+    }
+
+    void EmotionEngine::op_lwr()
+    {
+        static const uint32_t LWR_MASK[4] = { 0x000000, 0xff000000, 0xffff0000, 0xffffff00 };
+        static const uint8_t LWR_SHIFT[4] = { 0, 8, 16, 24 };
+        
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        uint32_t vaddr = offset + gpr[base].word[0];
+        uint32_t aligned_addr = vaddr & ~0x3;
+        int shift = vaddr & 0x3;
+
+        uint32_t data = read<uint32_t>(aligned_addr);
+        data = (gpr[rt].word[0] & LWR_MASK[shift]) | (data >> LWR_SHIFT[shift]);
+        gpr[rt].dword[0] = (int32_t)data;
+
+        log("LWR: GPR[{}] = {:#x} from address {:#x}\n", rt, gpr[rt].dword[0], vaddr);
+    }
+
+    void EmotionEngine::op_swl()
+    {
+        static const uint32_t SWL_MASK[4] = { 0xffffff00, 0xffff0000, 0xff000000, 0x00000000 };
+        static const uint8_t SWL_SHIFT[4] = { 24, 16, 8, 0 };
+        
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        uint32_t vaddr = offset + gpr[base].word[0];
+        uint32_t aligned_addr = vaddr & ~0x3;
+        int shift = vaddr & 0x3;
+
+        uint32_t data = read<uint32_t>(aligned_addr);
+        data = (gpr[rt].word[0] >> SWL_SHIFT[shift]) | (data & SWL_MASK[shift]);
+        write<uint32_t>(aligned_addr, data);
+
+        log("SWL: Writing {:#x} to address {:#x}\n", data, aligned_addr);
+    }
+
+    void EmotionEngine::op_swr()
+    {
+        static const uint32_t SWR_MASK[4] = { 0x00000000, 0x000000ff, 0x0000ffff, 0x00ffffff };
+        static const uint8_t SWR_SHIFT[4] = { 0, 8, 16, 24 };
+
+        uint16_t rt = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        uint32_t vaddr = offset + gpr[base].word[0];
+        uint32_t aligned_addr = vaddr & ~0x3;
+        int shift = vaddr & 0x3;
+
+        uint32_t data = read<uint32_t>(aligned_addr);
+        data = (gpr[rt].word[0] << SWR_SHIFT[shift]) | (data & SWR_MASK[shift]);
+        write<uint32_t>(aligned_addr, data);
+
+        log("SWR: Writing {:#x} to address {:#x}\n", data, aligned_addr);
+    }
+
+    void EmotionEngine::op_sqc2()
+    {
+        uint16_t ft = instr.i_type.rt;
+        uint16_t base = instr.i_type.rs;
+        int16_t offset = (int16_t)instr.i_type.immediate;
+
+        uint32_t vaddr = offset + gpr[base].word[0];
+        write<uint128_t>(vaddr, emulator->vu0->regs.vf[ft].qword);
+
+        log("SQC2: Writing VF[{}] to address {:#x}\n", ft, vaddr);
+    }
+
+    void EmotionEngine::op_dsra()
+    {
+        uint16_t sa = instr.r_type.sa;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        int64_t reg = gpr[rt].dword[0];
+        gpr[rd].dword[0] = reg >> sa;
+
+        log("DSRA: GPR[{:d}] = GPR[{:d}] ({:#x}) >> {:d}\n", rd, rt, gpr[rt].dword[0], sa);
     }
 
     void EmotionEngine::op_di()

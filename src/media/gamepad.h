@@ -66,12 +66,14 @@ namespace media
         void read_buttons(uint8_t cmd);
         void set_config(uint8_t value);
         void query(uint8_t half);
+        void query_mode(uint8_t index);
 
     public:
         Response response = nullptr;
         static uint8_t responses[16][18];
         int written = 0;
         int custom_response = -1;
+        uint8_t current_response = 0;
         PadMode mode = PadMode::Digital;
         uint16_t buttons = 0xffff;
         uint8_t command = 0;

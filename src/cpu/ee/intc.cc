@@ -21,7 +21,7 @@ namespace ee
 		auto offset = (addr >> 4) & 0xf;
 		auto ptr = (uint32_t*)&regs + offset;
 
-		fmt::print("[INTC] Reading {:#x} from {}\n", *ptr, REGS[offset]);
+		/*fmt::print("[INTC] Reading {:#x} from {}\n", *ptr, REGS[offset]);*/
 		return *ptr;
 	}
 

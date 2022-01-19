@@ -4,11 +4,13 @@
 #include <fstream>
 #include <sstream>
 
+bool print_pc = false;
+
 #ifndef NDEBUG
 #define log(...) ((void)0)
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
-#define log(...) fmt::print(disassembly, __VA_ARGS__)
+#define log(...) if (print_pc) fmt::print(disassembly, __VA_ARGS__)
 #endif
 
 namespace iop

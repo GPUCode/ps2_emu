@@ -2,6 +2,7 @@
 #include <cstring>
 #include <cstdio>
 #include <fmt/core.h>
+#include <fstream>
 
 namespace media
 {
@@ -11,7 +12,7 @@ namespace media
    on demand. */
     uint8_t Gamepad::responses[16][18] =
     {
-        {}, {}, {}, {}, {}, { 0x03, 0x02, 0x00, 0x02, 0x01, 0x00 }, {},
+        {}, {}, {}, {}, {}, { 0x01, 0x02, 0x00, 0x02, 0x01, 0x00 }, {},
         { 0x00, 0x00, 0x02, 0x00, 0x01, 0x00 }
     };
 
@@ -36,11 +37,17 @@ namespace media
         mode = (PadMode)m;
     }
 
+    void Gamepad::query_mode(uint8_t index)
+    {
+        fmt::print("[PAD] Query mode on index {:d}\n", index);
+        responses[current_response][3] = 4 + index * 3;
+    }
+
     void Gamepad::read_buttons(uint8_t cmd)
     {
         fmt::print("[PAD] Reading button state: {:#b}\n", buttons);
         uint8_t offset = written - 4;
-        responses[command & 0xf][offset] = (buttons >> offset) & 0xff;
+        responses[current_response][offset] = (buttons >> offset) & 0xff;
         
         /* Chain response */
         set_response(4, &Gamepad::read_buttons);
@@ -54,16 +61,16 @@ namespace media
         if (!config_mode)
             read_buttons(value);
         else /* Otherwise return zero */
-            std::memset(responses[command & 0xf], 0, 2);
+            std::memset(responses[current_response], 0, 2);
 
         config_mode = value;
     }
 
     void Gamepad::query(uint8_t half)
     {
-        static uint8_t constants[2][6] = { { 0x0, 0x0, 0x0, 0x2, 0x0, 0xa }, { 0x0, 0x0, 0x0, 0x0, 0x0, 0x14 } };
+        static uint8_t constants[2][6] = { { 0x0, 0x0, 0x1, 0x2, 0x0, 0xa }, { 0x0, 0x0, 0x1, 0x1, 0x1, 0x14 } };
         fmt::print("[PAD] Query act {:d}\n", half);
-        std::memcpy(responses[command & 0xf], constants[half], 6);
+        std::memcpy(responses[current_response], constants[half], 6);
     }
 
     inline void Gamepad::set_response(uint16_t byte_id, Response resp)
@@ -84,6 +91,7 @@ namespace media
         }
 
         command = cmd;
+        current_response = command & 0xf;
         uint8_t reply = 0xf3;
         switch (cmd)
         {
@@ -117,6 +125,11 @@ namespace media
         case PadCommand::QUERY_COMB:
         {
             fmt::print("[PAD] Query comb\n");
+            break;
+        }
+        case PadCommand::QUERY_MODE:
+        {
+            set_response(3, &Gamepad::query_mode);
             break;
         }
         default:

@@ -120,7 +120,7 @@ namespace media
 			   first starting a transfer */
 			if (just_started) gamepad.written = 0;
 			auto reply = gamepad.write_byte(cmd);
-			
+
 			fmt::print("[SIO2] Gamepad returned: {:#x}\n", reply);
 			sio2_fifo.push(reply);
 			break;

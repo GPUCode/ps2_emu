@@ -17,14 +17,13 @@ namespace vu
 		VUInstr vu_instr = { .value = instr.value };
 		switch (function)
 		{
-		case 0b101100:
-			return op_vsub(vu_instr);
-		case 0b110000:
-			return op_viadd(vu_instr);
-		case 0b111100 ... 0b111111:
-			return special2(instr);
+		case 0b101100: op_vsub(vu_instr); break;
+		case 0b110000: op_viadd(vu_instr); break;
+		case 0b101000: op_vadd(vu_instr); break;
+		case 0b111100 ... 0b111111: special2(instr); break;
 		default:
 			fmt::print("[VU0] Unimplemented special1 macro operation {:#08b}\n", function);
+			std::abort();
 		}
 	}
 
@@ -42,8 +41,10 @@ namespace vu
 		case 0b0001100: op_vmsuba(vu_instr); break;
 		case 0b0111111: op_viswr(vu_instr); break;
 		case 0b0110101: op_vsqi(vu_instr); break;
+		case 0b0110001: op_vmr32(vu_instr); break;
 		default:
 			fmt::print("[VU0] Unimplemented special2 macro operation {:#09b}\n", opcode);
+			std::abort();
 		}
 	}
 
@@ -124,10 +125,10 @@ namespace vu
 		for (int i = 0; i < 4; i++)
 		{
 			/* If the component is set in the dest mask */
-			if (instr.dest & (1 << i))
+			if (instr.dest & (1 << (3 - i)))
 			{
 				fmt::print("{}, ", "XYZW"[i]);
-				regs.vf[fd].x = regs.vf[fs].x - regs.vf[ft].x;
+				regs.vf[fd].fword[i] = regs.vf[fs].fword[i] - regs.vf[ft].fword[i];
 			}
 		}
 		fmt::print("\b\b)\n");
@@ -150,7 +151,7 @@ namespace vu
 		for (int i = 0; i < 4; i++)
 		{
 			/* If the component is set in the dest mask */
-			if (instr.dest & (1 << i))
+			if (instr.dest & (1 << (3 - i)))
 			{
 				fmt::print("{}, ", "XYZW"[i]);
 				*(ptr + i) = regs.vf[fs].word[i];
@@ -179,7 +180,7 @@ namespace vu
 		for (int i = 0; i < 4; i++)
 		{
 			/* If the component is set in the dest mask */
-			if (instr.dest & (1 << i))
+			if (instr.dest & (1 << (3 - i)))
 			{
 				fmt::print("{}, ", "XYZW"[i]);
 				acc.fword[i] = regs.vf[fs].fword[i] - regs.vf[ft].fword[i];
@@ -197,7 +198,7 @@ namespace vu
 		for (int i = 0; i < 4; i++)
 		{
 			/* If the component is set in the dest mask */
-			if (instr.dest & (1 << i))
+			if (instr.dest & (1 << (3 - i)))
 			{
 				fmt::print("{}, ", "XYZW"[i]);
 				acc.fword[i] += regs.vf[fs].fword[i] * regs.vf[ft].fword[i];
@@ -215,7 +216,7 @@ namespace vu
 		for (int i = 0; i < 4; i++)
 		{
 			/* If the component is set in the dest mask */
-			if (instr.dest & (1 << i))
+			if (instr.dest & (1 << (3 - i)))
 			{
 				fmt::print("{}, ", "XYZW"[i]);
 				acc.fword[i] -= regs.vf[fs].fword[i] * regs.vf[ft].fword[i];
@@ -233,10 +234,47 @@ namespace vu
 		for (int i = 0; i < 4; i++)
 		{
 			/* If the component is set in the dest mask */
-			if (instr.dest & (1 << i))
+			if (instr.dest & (1 << (3 - i)))
 			{
 				fmt::print("{}, ", "XYZW"[i]);
 				regs.vf[ft].fword[i] = (float)regs.vf[fs].word[i];
+			}
+		}
+		fmt::print("\b\b)\n");
+	}
+
+	void VU0::op_vadd(VUInstr instr)
+	{
+		uint16_t fd = instr.fd;
+		uint16_t fs = instr.fs;
+		uint16_t ft = instr.ft;
+
+		fmt::print("[VU0] VADD: VF[{}] = VF[{}] + VF[{}] (", fd, fs, ft);
+		for (int i = 0; i < 4; i++)
+		{
+			/* If the component is set in the dest mask */
+			if (instr.dest & (1 << (3 - i)))
+			{
+				fmt::print("{}, ", "XYZW"[i]);
+				regs.vf[fd].fword[i] = regs.vf[fs].fword[i] + regs.vf[ft].fword[i];
+			}
+		}
+		fmt::print("\b\b)\n");
+	}
+
+	void VU0::op_vmr32(VUInstr instr)
+	{
+		uint16_t fs = instr.fs;
+		uint16_t ft = instr.ft;
+
+		fmt::print("[VU0] VMR32: VF[{}] = ROT VF[{}] (", ft, fs);
+		for (int i = 0; i < 4; i++)
+		{
+			/* If the component is set in the dest mask */
+			if (instr.dest & (1 << (3 - i)))
+			{
+				fmt::print("{}, ", "XYZW"[i]);
+				regs.vf[ft].fword[i] = regs.vf[fs].fword[(i + 1) % 4];
 			}
 		}
 		fmt::print("\b\b)\n");

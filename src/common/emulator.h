@@ -47,7 +47,7 @@ namespace common
     constexpr uint32_t KUSEG_MASKS[8] = 
     {
         /* KUSEG: Don't touch the address, it's fine */
-        0xffffffff, 0x1fffffff, 0xffffffff, 0xffffffff,
+        0xffffffff, 0x1fffffff, 0x1fffffff, 0xffffffff,
         /* KSEG0: Strip the MSB (0x8 -> 0x0 and 0x9 -> 0x1) */
         0x7fffffff,
         /* KSEG1: Strip the 3 MSB's (0xA -> 0x0 and 0xB -> 0x1) */

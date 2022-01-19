@@ -81,15 +81,18 @@ namespace vu
 		void op_vmadda(VUInstr instr);
 		void op_vmsuba(VUInstr instr);
 		void op_vitof0(VUInstr instr);
+		void op_vadd(VUInstr instr);
+		void op_vmr32(VUInstr instr);
 
-	private:
-		ee::EmotionEngine* cpu;
 		Registers regs = {};
 		Vector acc;
 
 		/* VU0 memory */
 		uint8_t data[4 * 1024] = {};
 		uint8_t code[4 * 1024] = {};
+
+	private:
+		ee::EmotionEngine* cpu;
 	};
 	
 	template<typename T>
