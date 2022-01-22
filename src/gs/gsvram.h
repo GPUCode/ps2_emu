@@ -3,19 +3,34 @@
 
 namespace gs
 {
-	/* GS Memory constructs */
+	/* Common GS memory constructs */
 	constexpr uint16_t PAGE_SIZE = 8192;
-	constexpr uint16_t BLOCK_SIZE = 256;
 	constexpr uint16_t BLOCKS_PER_PAGE = 32;
-
-	/* Block dimentations */
-	constexpr uint16_t BLOCK_PIXEL_WIDTH = 8;
-	constexpr uint16_t BLOCK_PIXEL_HEIGHT = 8;
-
-	/* Column definition */
-	constexpr uint16_t COLUMN_PIXEL_HEIGHT = 2;
+	constexpr uint16_t BLOCK_SIZE = 256;
 	constexpr uint16_t COLUMNS_PER_BLOCK = 4;
 	constexpr uint16_t COLUMN_SIZE = 64;
+
+	enum PixelFormat : uint8_t
+	{
+		PSMCT32 = 0x0,
+		PSMCT24 = 0x1,
+		PSMCT16 = 0x2,
+		PSMCT16S = 0xa,
+		PSMCT8 = 0x13,
+		PSMCT4 = 0x14,
+		PSMCT8H = 0x1b,
+		PSMCT4HL = 0x24,
+		PSMCT4HH = 0x2c,
+		PSMZ32 = 0x30,
+		PSMZ24 = 0x31,
+		PSMZ16 = 0x32,
+		PSMZ16S = 0x3a
+	};
+
+	/* This contains info about each pixel format. */
+	/* It is specialized per format */
+	template <PixelFormat fmt>
+	struct FormatInfo;
 
 	struct Page
 	{
@@ -26,38 +41,10 @@ namespace gs
 		constexpr static uint16_t BLOCK_HEIGHT = 4;
 
 		/* Write a 32bit value to a PSMCT32 buffer */
-		void write_psmct32(uint16_t x, uint16_t y, uint32_t value)
-		{
-			/* Get the coords of the curerent block inside the page */
-			uint16_t block_x = (x / BLOCK_PIXEL_WIDTH) % BLOCK_WIDTH;
-			uint16_t block_y = (y / BLOCK_PIXEL_HEIGHT) % BLOCK_HEIGHT;
+		void write_psmct32(uint16_t x, uint16_t y, uint32_t value);
 
-			/* Block layout in the page */
-			constexpr static int block_layout[4][8] =
-			{
-				{  0,  1,  4,  5, 16, 17, 20, 21 },
-				{  2,  3,  6,  7, 18, 19, 22, 23 },
-				{  8,  9, 12, 13, 24, 25, 28, 29 },
-				{ 10, 11, 14, 15, 26, 27, 30, 31 }
-			};
-
-			/* Blocks in a page are not stored linearly so use small
-			   lookup table to figure out the offset of the block in memory */
-			uint16_t block = block_layout[block_y][block_x] % BLOCKS_PER_PAGE;
-
-			uint32_t column = (y / COLUMN_PIXEL_HEIGHT) % COLUMNS_PER_BLOCK;
-
-			constexpr static int pixels[2][8]
-			{
-				{ 0, 1, 4, 5,  8,  9, 12, 13 },
-				{ 2, 3, 6, 7, 10, 11, 14, 15 }
-			};
-			/* Pixels in columns are not stored linearly either... */
-			uint32_t pixel = pixels[y & 0x1][x % 8];
-			uint32_t offset = column * COLUMN_SIZE + pixel * 4;
-
-			*(uint32_t*)&blocks[block][offset] = value;
-		}
+		/* Write a 16bit value to a PSMCT16 buffer */
+		void write_psmct16(uint16_t x, uint16_t y, uint16_t value);
 
 	private:
 		uint8_t blocks[BLOCKS_PER_PAGE][BLOCK_SIZE] = {};

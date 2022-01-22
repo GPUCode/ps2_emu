@@ -150,7 +150,7 @@ namespace ee
         /* MMI instructions */
         void op_plzcw(); void op_mfhi1(); void op_mthi1(); void op_mtlo1();
         void op_pcpyh(); void op_pcpyld(); void op_pnor(); void op_psubb();
-        void op_pand(); void op_pcpyud(); void op_pxor();
+        void op_pand(); void op_pcpyud(); void op_pxor(); void op_psubw();
 
         /* Registers. */
         Register gpr[32] = {};

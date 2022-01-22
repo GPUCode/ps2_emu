@@ -1575,6 +1575,20 @@ namespace ee
         log("PXOR\n");
     }
 
+    void EmotionEngine::op_psubw()
+    {
+        uint16_t rs = instr.r_type.rs;
+        uint16_t rd = instr.r_type.rd;
+        uint16_t rt = instr.r_type.rt;
+
+        for (int i = 0; i < 4; i++)
+        {
+            gpr[rd].word[i] = (int32_t)gpr[rs].word[i] - (int32_t)gpr[rt].word[i];
+        }
+
+        log("PSUBW\n");
+    }
+
     void EmotionEngine::op_dsrav()
     {
         uint16_t rs = instr.r_type.rs;
@@ -1706,6 +1720,7 @@ namespace ee
             switch (instr.r_type.sa)
             {
             case 0b01001: op_psubb(); break;
+            case 0b00001: op_psubw(); break;
             default:
                 fmt::print("[ERROR] Unimplemented MMI0 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
                 std::abort();

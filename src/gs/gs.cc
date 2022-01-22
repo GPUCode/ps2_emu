@@ -170,6 +170,7 @@ namespace gs
 			break;
 		case 0x53:
 			regs.trxdir = data;
+			data_written = 0;
 			break;
 		default:
 			fmt::print("[GS] Writting {:#x} to unknown address {:#x}\n", data, addr);
@@ -190,24 +191,18 @@ namespace gs
 		auto& bitbltbuf = regs.bitbltbuf;
 		auto& trxpos = regs.trxpos;
 		auto& trxreg = regs.trxreg;
+		
+		/* Useful for many things */
+		uint32_t width_in_pages = bitbltbuf.dest_width;
+		uint32_t width_in_pixels = trxreg.width;
 
 		uint16_t format = regs.bitbltbuf.dest_pixel_format;
 		switch (format)
 		{
-		/* Page layout of PSMCT32
-		  <------- 8 blocks/64 pixels ------->
-		| 0| | 1| | 4| | 5| |16| |17| |20| |21| ^
-		| 2| | 3| | 6| | 7| |18| |19| |22| |23| | 4 blocks/32 pixels
-		| 8| | 9| |12| |13| |24| |25| |28| |29| |
-		|10| |11| |14| |15| |26| |27| |30| |31| | */
 		case PixelFormat::PSMCT32:
 		{
-			/* Calculate which page we are refering to */
-			uint32_t page = bitbltbuf.dest_base / BLOCKS_PER_PAGE;
-			uint32_t width_in_pages = bitbltbuf.dest_width;
-			uint32_t width_in_pixels = trxreg.width;
-			
 			/* HWREG values are 64bit so they pack 2 pixels together */
+			uint32_t* pixels = (uint32_t*)&data;
 			for (int i = 0; i < 2; i++)
 			{
 				uint16_t x = data_written % width_in_pixels;
@@ -215,15 +210,34 @@ namespace gs
 
 				fmt::print("[GS] Writing to PSMCT32 buffer at ({}, {})\n", x, y);
 
+				/* Calculate which page we are refering to */
 				/* NOTE: x, y can refer to outside of the selected page (if their values are bigger than the page dimentions) */
 				/* Update the page accordingly. Loop back if the page is over the page width */
+				uint32_t page = bitbltbuf.dest_base / BLOCKS_PER_PAGE;
 				page += (x / Page::PIXEL_WIDTH) % width_in_pages + (y / Page::PIXEL_HEIGHT) * width_in_pages;
-				uint32_t* pixels = (uint32_t*)&data;
-			
+				
 				vram[page].write_psmct32(x, y, pixels[i]);
 				data_written++;
 			}
 			
+			break;
+		}
+		case PixelFormat::PSMCT16:
+		{
+			uint16_t* pixels = (uint16_t*)&data;
+			for (int i = 0; i < 4; i++)
+			{
+				uint16_t x = data_written % width_in_pixels;
+				uint16_t y = data_written / width_in_pixels;
+
+				fmt::print("[GS] Writing to PSMCT16 buffer at ({}, {})\n", x, y);
+
+				uint32_t page = bitbltbuf.dest_base / BLOCKS_PER_PAGE;
+				page += (x / 64) % width_in_pages + (y / 64) * width_in_pages;
+
+				vram[page].write_psmct16(x, y, pixels[i]);
+				data_written++;
+			}
 			break;
 		}
 		default:
@@ -231,6 +245,7 @@ namespace gs
 			std::abort();
 		}
 
+		/* Check if transfer has completed */
 		if (data_written >= trxreg.width * trxreg.height)
 		{
 			fmt::print("[GS] HWREG transfer complete!\n");

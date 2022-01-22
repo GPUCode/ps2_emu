@@ -163,23 +163,6 @@ namespace gs
 		None = 3
 	};
 
-	enum PixelFormat : uint8_t
-	{
-		PSMCT32 = 0x0,
-		PSMCT24 = 0x1,
-		PSMCT16 = 0x2,
-		PSMCT16S = 0xa,
-		PSMCT8 = 0x13,
-		PSMCT4 = 0x14,
-		PSMCT8H = 0x1b,
-		PSMCT4HL = 0x24,
-		PSMCT4HH = 0x2c,
-		PSMZ32 = 0x30,
-		PSMZ24 = 0x31,
-		PSMZ16 = 0x32,
-		PSMZ16S = 0x3a
-	};
-
 	struct GraphicsSynthesizer : public common::Component
 	{
 		friend struct GIF;
