@@ -44,12 +44,10 @@ namespace gs
 		uint32_t GIF_P3TAG;
 	};
 
-	constexpr uint16_t GIF_TAG_NULL = -1;
-
 	/* The header of each GS Primitive */
 	union GIFTag
 	{
-		uint128_t value = GIF_TAG_NULL;
+		uint128_t value;
 		struct
 		{
 			uint128_t nloop : 15;
@@ -110,5 +108,8 @@ namespace gs
 		/* Used during transfers */
 		GIFTag tag;
 		int data_count = 0, reg_count = 0;
+
+		/* Stores the last Q value provided by ST */
+		uint32_t interal_Q;
 	};
 }

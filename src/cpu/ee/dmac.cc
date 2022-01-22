@@ -3,6 +3,7 @@
 #include <cpu/ee/ee.h>
 #include <cpu/iop/iop.h>
 #include <common/sif.h>
+#include <gs/gif.h>
 #include <cassert>
 
 inline uint32_t get_channel(uint32_t value)
@@ -94,6 +95,11 @@ namespace ee
 		auto ptr = (uint32_t*)&channels[channel] + offset;
 
 		fmt::print("[DMAC] Writing {:#x} to {} of channel {:d}\n", data, REGS[offset], channel);
+		/* The lower bits of MADR must be zero: */
+		/* NOTE: This is actually required since the BIOS writes
+		   unaligned addresses to the GIF channel for some reason
+		   and expects it to be read correctly... */
+		data = (offset == 1 ? data &= 0x01fffff0 : data);
 		*ptr = data;
 
 		if (channels[channel].control.running)
@@ -174,6 +180,23 @@ namespace ee
 						/* This is channel specific */
 						switch (id)
 						{
+						case DMAChannels::GIF:
+						{
+							auto& gif = emulator->gif;
+							uint128_t qword = *(uint128_t*)&emulator->ee->ram[channel.address];
+							uint64_t upper = qword >> 64, lower = qword;
+							fmt::print("[DMAC][GIF] Writing {:#x}{:016x} to PATH3\n", upper, lower);
+
+							gif->write_path3(0x10006000, qword);
+							channel.address += 16;
+							channel.qword_count--;
+
+							assert(!channel.control.mode);
+							if (!channel.qword_count)
+								channel.end_transfer = true;
+
+							break;
+						}
 						case DMAChannels::SIF0:
 						{
 							/* SIF0 receives data from the SIF0 fifo */
@@ -223,6 +246,7 @@ namespace ee
 						}
 						default:
 							fmt::print("[DMAC] Unknown channel transfer with id {:d}\n", id);
+							std::abort();
 						}
 					} /* If the transfer ended, disable channel */
 					else if (channel.end_transfer)

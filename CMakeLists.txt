@@ -32,7 +32,7 @@ add_executable(${PROJECT_NAME}
 	"src/media/cdvd.cc"
 	"src/media/sio2.cc"
 	"src/media/gamepad.cc"
-)
+ "src/gs/gsvram.h")
 
 # Link to all the required conan libs
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)

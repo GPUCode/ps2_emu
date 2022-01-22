@@ -55,7 +55,7 @@ namespace gs
 	{
 		assert(addr == 0x10006000);
 
-		if (tag.value == GIF_TAG_NULL) /* Initiallize tag */
+		if (!data_count) /* Initiallize tag */
 		{
 			auto& gs_regs = emulator->gs->regs;
 			tag.value = qword;
@@ -71,31 +71,35 @@ namespace gs
 
 			/* The initial value of Q is 1.0f and is set
 			   when the GIFTag is read */
-			gs_regs.rgbaq.q = 1;
+			gs_regs.rgbaq.q = 1.0f;
 		}
 		else
 		{
-			if (data_count == 0)
-			{
-				/* Nullify the current tag to get a new one */
-				tag.value = GIF_TAG_NULL;
-				return;
-			}
-
-			if (reg_count == 0)
-			{
-				data_count--;
-				reg_count = tag.nreg;
-			}
-
 			uint16_t format = tag.flg;
 			switch (format)
 			{
 			case Format::PACKED:
+			{
 				process_packed(qword);
+				if (!reg_count)
+				{
+					data_count--;
+					reg_count = tag.nreg;
+				}
 				break;
+			}
+			case Format::IMAGE:
+			{
+				uint64_t lower = qword;
+				uint64_t upper = qword >> 64;
+				emulator->gs->write_hwreg(lower);
+				emulator->gs->write_hwreg(upper);
+				data_count--;
+				break;
+			}
 			default:
 				fmt::print("[GIF] Unknown format {:d}\n", format);
+				std::abort();
 			}
 		}
 	}
@@ -107,8 +111,29 @@ namespace gs
 		uint32_t desc = (regs >> 4 * curr_reg) & 0xf;
 
 		/* Process the qword based on the descriptor */
+		auto& gs_regs = emulator->gs->regs;
 		switch (desc)
 		{
+		case REGDesc::PRIM:
+		{
+			gs_regs.prim = qword & 0x7ff;
+			break;
+		}
+		case REGDesc::ST:
+		{
+			gs_regs.st = qword;
+			interal_Q = qword >> 64;
+			break;
+		}
+		case REGDesc::XYZ2:
+		{
+			bool db = (qword >> 64) & (1ULL << 48);
+			auto& xyz = (db ? gs_regs.xyz3 : gs_regs.xyz2);
+			xyz.x = qword & 0xffff;
+			xyz.y = (qword >> 32) & 0xffff;
+			xyz.z = ((qword >> 64) >> 37) & 0xffffffff;
+			break;
+		}
 		case REGDesc::A_D:
 		{
 			uint64_t data = qword;
@@ -118,6 +143,7 @@ namespace gs
 		}
 		default:
 			fmt::print("[GIF] Unknown reg descritptor {:#x}!\n", desc);
+			std::abort();
 		}
 
 		reg_count--;

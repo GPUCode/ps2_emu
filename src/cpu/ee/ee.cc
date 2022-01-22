@@ -903,6 +903,13 @@ namespace ee
 
     void EmotionEngine::op_ldl()
     {
+        static const uint64_t LDL_MASK[8] =
+        {   
+            0x00ffffffffffffffULL, 0x0000ffffffffffffULL, 0x000000ffffffffffULL, 0x00000000ffffffffULL,
+            0x0000000000ffffffULL, 0x000000000000ffffULL, 0x00000000000000ffULL, 0x0000000000000000ULL
+        };
+        static const uint8_t LDL_SHIFT[8] = { 56, 48, 40, 32, 24, 16, 8, 0 };
+        
         uint16_t rt = instr.i_type.rt;
         uint16_t base = instr.i_type.rs;
         int16_t offset = (int16_t)instr.i_type.immediate;
@@ -910,20 +917,24 @@ namespace ee
         /* The address given is unaligned, so let's align it first */
         uint32_t addr = offset + gpr[base].word[0];
         uint32_t aligned_addr = addr & ~0x7;
-        auto qword = read<uint64_t>(aligned_addr);
-
-        /* How many bytes to transfer? */
-        uint16_t bcount = addr & 0x7;
-        for (int i = bcount; i >= 0; i--)
-        {
-            gpr[rt].byte[bcount - i] = *((uint8_t*)&qword + i);
-        }
+        uint32_t shift = addr & 0x7;
+        
+        auto dword = read<uint64_t>(aligned_addr);
+        uint64_t result = (gpr[rt].dword[0] & LDL_MASK[shift]) | (dword << LDL_SHIFT[shift]);
+        gpr[rt].dword[0] = result;
 
         log("LDL: GPR[{}] = {:#x} with data from {:#x}\n", rt, gpr[rt].dword[0], addr);
     }
 
     void EmotionEngine::op_ldr()
     {
+        static const uint64_t LDR_MASK[8] =
+        { 
+            0x0000000000000000ULL, 0xff00000000000000ULL, 0xffff000000000000ULL, 0xffffff0000000000ULL,
+            0xffffffff00000000ULL, 0xffffffffff000000ULL, 0xffffffffffff0000ULL, 0xffffffffffffff00ULL
+        };
+        static const uint8_t LDR_SHIFT[8] = { 0, 8, 16, 24, 32, 40, 48, 56 };
+
         uint16_t rt = instr.i_type.rt;
         uint16_t base = instr.i_type.rs;
         int16_t offset = (int16_t)instr.i_type.immediate;
@@ -931,20 +942,24 @@ namespace ee
         /* The address given is unaligned, so let's align it first */
         uint32_t addr = offset + gpr[base].word[0];
         uint32_t aligned_addr = addr & ~0x7;
-        auto qword = read<uint64_t>(aligned_addr);
+        uint16_t shift = addr & 0x7;
 
-        /* How many bytes to transfer? */
-        uint16_t bcount = addr & 0x7;
-        for (int i = bcount; i < 8; i++)
-        {
-            gpr[rt].byte[7 - (i - bcount)] = *((uint8_t*)&qword + i);
-        }
+        auto dword = read<uint64_t>(aligned_addr);
+        uint64_t result = (gpr[rt].dword[0] & LDR_MASK[shift]) | (dword >> LDR_SHIFT[shift]);
+        gpr[rt].dword[0] = result;
 
         log("LDR: GPR[{}] = {:#x} with data from {:#x}\n", rt, gpr[rt].dword[0], addr);
     }
 
     void EmotionEngine::op_sdl()
     {
+        static const uint64_t SDL_MASK[8] =
+        { 
+            0xffffffffffffff00ULL, 0xffffffffffff0000ULL, 0xffffffffff000000ULL, 0xffffffff00000000ULL,
+            0xffffff0000000000ULL, 0xffff000000000000ULL, 0xff00000000000000ULL, 0x0000000000000000ULL
+        };
+        static const uint8_t SDL_SHIFT[8] = { 56, 48, 40, 32, 24, 16, 8, 0 };
+
         uint16_t rt = instr.i_type.rt;
         uint16_t base = instr.i_type.rs;
         int16_t offset = (int16_t)instr.i_type.immediate;
@@ -952,21 +967,24 @@ namespace ee
         /* The address given is unaligned, so let's align it first */
         uint32_t addr = offset + gpr[base].word[0];
         uint32_t aligned_addr = addr & ~0x7;
-        auto qword = read<uint64_t>(aligned_addr);
+        uint32_t shift = addr & 0x7;
 
-        /* How many bytes to transfer? */
-        uint16_t bcount = addr & 0x7;
-        for (int i = bcount; i >= 0; i--)
-        {
-            *((uint8_t*)&qword + i) = gpr[rt].byte[bcount - i];
-        }
+        auto dword = read<uint64_t>(aligned_addr);
+        dword = (gpr[rt].dword[0] >> SDL_SHIFT[shift]) | (dword & SDL_MASK[shift]);
+        write<uint64_t>(aligned_addr, dword);
 
-        write<uint64_t>(aligned_addr, qword);
-        log("SDL: Writing {:#x} to address {:#x}\n", qword, aligned_addr);
+        log("SDL: Writing {:#x} to address {:#x}\n", dword, aligned_addr);
     }
 
     void EmotionEngine::op_sdr()
     {
+        static const uint64_t SDR_MASK[8] =
+        { 
+            0x0000000000000000ULL, 0x00000000000000ffULL, 0x000000000000ffffULL, 0x0000000000ffffffULL,
+            0x00000000ffffffffULL, 0x000000ffffffffffULL, 0x0000ffffffffffffULL, 0x00ffffffffffffffULL
+        };
+        static const uint8_t SDR_SHIFT[8] = { 0, 8, 16, 24, 32, 40, 48, 56 };
+        
         uint16_t rt = instr.i_type.rt;
         uint16_t base = instr.i_type.rs;
         int16_t offset = (int16_t)instr.i_type.immediate;
@@ -974,17 +992,13 @@ namespace ee
         /* The address given is unaligned, so let's align it first */
         uint32_t addr = offset + gpr[base].word[0];
         uint32_t aligned_addr = addr & ~0x7;
-        auto qword = read<uint64_t>(aligned_addr);
+        uint32_t shift = addr & 0x7;
 
-        /* How many bytes to transfer? */
-        uint16_t bcount = addr & 0x7;
-        for (int i = bcount; i < 8; i++)
-        {
-            *((uint8_t*)&qword + i) = gpr[rt].byte[7 - (i - bcount)];
-        }
+        auto dword = read<uint64_t>(aligned_addr);
+        dword = (gpr[rt].dword[0] << SDR_SHIFT[shift]) | (dword & SDR_MASK[shift]);
+        write<uint64_t>(aligned_addr, dword);
 
-        write<uint64_t>(aligned_addr, qword);
-        log("SDR: Writing {:#x} to address {:#x}\n", qword, addr);
+        log("SDR: Writing {:#x} to address {:#x}\n", dword, addr);
     }
 
     void EmotionEngine::op_dsrl()

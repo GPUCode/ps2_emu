@@ -97,10 +97,10 @@ namespace common
         while (total_cycles < CYCLES_PER_FRAME)
         {
             uint32_t cycles = CYCLES_PER_TICK;
-            
+
             /* Tick componets that run at EE speed */
             ee->tick(cycles);
-            
+
             /* Tick bus components */
             cycles /= 2;
             dmac->tick(cycles);
