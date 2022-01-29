@@ -1232,7 +1232,12 @@ namespace ee
 
         uint32_t data = read<uint32_t>(aligned_addr);
         data = (gpr[rt].word[0] & LWR_MASK[shift]) | (data >> LWR_SHIFT[shift]);
-        gpr[rt].dword[0] = (int32_t)data;
+        
+        /* NOTE: Only if LWR loads the sign bit, do the upper 64bits of the register get written! */
+        if (!shift)
+            gpr[rt].dword[0] = (int32_t)data;
+        else
+            gpr[rt].word[0] = data;
 
         log("LWR: GPR[{}] = {:#x} from address {:#x}\n", rt, gpr[rt].dword[0], vaddr);
     }
