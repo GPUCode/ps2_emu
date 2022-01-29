@@ -1,166 +1,273 @@
 #include <cpu/vu/vif.h>
 #include <common/emulator.h>
+#include <cpu/vu/vu.h>
 #include <cassert>
-
-constexpr const char* REGS[] =
-{
-	"VIF_STAT", "VIF_FBRST",
-	"VIF_ERR", "VIF_MARK",
-	"VIF_CYCLE", "VIF_MODE",
-	"VIF_NUM", "VIF_MASK"
-};
+#include <algorithm>
 
 namespace vu
 {
-	VIF::VIF(common::Emulator* parent) :
-		emulator(parent)
+	constexpr const char* VIF_REGS[] =
 	{
+		"VIF_STAT", "VIF_FBRST",
+		"VIF_ERR", "VIF_MARK",
+		"VIF_CYCLE", "VIF_MODE",
+		"VIF_NUM", "VIF_MASK"
+	};
+
+	constexpr const char* UNPACK_FORMATS[4][4] =
+	{
+		{ "S-32", "V2-32", "V3-32", "V4-32" },
+		{ "S-16", "V2-16", "V3-16", "V4-16" },
+		{ "S-8",  "V2-8",  "V3-8",  "V4-8" },
+		{ "V4-5" }
+	};
+
+	VIF::VIF(common::Emulator* parent, int N) :
+		emulator(parent), id(N)
+	{
+		uint32_t reg_addr = 0x10003800 | (id << 10);
+		uint32_t fifo_addr = 0x10004000 | (id << 12);
+
 		/* Register VIF register set */
-		emulator->add_handler(0x10003800, this, &VIF::read, &VIF::write);
-		emulator->add_handler(0x10003C00, this, &VIF::read, &VIF::write);
-
-		/* Register VIF0/VIF1 fifos */
-		emulator->add_handler<uint128_t>(0x10004000, this, nullptr, &VIF::write_fifo);
-		emulator->add_handler<uint128_t>(0x10005000, this, nullptr, &VIF::write_fifo);
+		emulator->add_handler(reg_addr, this, &VIF::read, &VIF::write);
+		emulator->add_handler<uint128_t>(fifo_addr, this, nullptr, &VIF::write_fifo<uint128_t>);
 	}
 	
-	uint32_t VIF::read(uint32_t addr)
+	void VIF::tick(uint32_t cycles)
 	{
-		return uint32_t();
-	}
-	
-	void VIF::write(uint32_t addr, uint32_t data)
-	{
-		uint32_t vif = (addr & 0x4000) >> 14;
-		uint32_t offset = (addr >> 4) & 0xf;
-		auto ptr = (uint32_t*)&registers[vif] + offset;
-
-		fmt::print("[VIF{}] Writing {:#x} to {}\n", vif, data, REGS[offset]);
-		*ptr = (offset == 0 ? data & 0x1 : data);
-	}
-	
-	void VIF::write_fifo(uint32_t addr, uint128_t data)
-	{
-		assert(addr == 0x10005000 || addr == 0x10004000);
-		
-		/* Get target register set */
-		uint32_t vif = (addr & 0x1000) >> 12;
-		auto& regs = registers[vif];
-
-		/* This is set by commands that expect data packets */
-		static uint32_t command = 0, data_remaining = 0;
-
-		auto vif_packets = (uint32_t*)&data;
-		for (int i = 0; i < 4; i++)
+		word_cycles = cycles * 4;
+		while (!fifo.empty() && word_cycles--)
 		{
-			uint32_t packet = *(vif_packets + i);
-			if (!data_remaining)
-			{
-				/* Process VIF command */
-				command = (packet >> 24) & 0x7f;
-				uint16_t imm = packet & 0xffff;
-				switch (command)
-				{
-				case 0x0:
-				{
-					fmt::print("[VIF{}] NOP\n", vif);
-					break;
-				}
-				case 0x1:
-				{
-					regs.cycle.cycle_length = imm;
-					fmt::print("[VIF{}] STCYCL: CYCLE = {:#x}\n", vif, imm);
-					break;
-				}
-				case 0x2:
-				{
-					regs.ofst = imm & 0x3ff;
-					regs.status.double_buffer_flag = 0;
-					regs.base = regs.tops;
-					fmt::print("[VIF{}] OFFSET: OFST = {:#x} BASE = TOPS = {:#x}\n", vif, regs.ofst, regs.tops);
-					break;
-				}
-				case 0x3:
-				{
-					regs.base = imm & 0x3ff;
-					fmt::print("[VIF{}] BASE: BASE = {:#x}\n", vif, regs.base);
-					break;
-				}
-				case 0x4:
-				{
-					regs.itop = imm & 0x3ff;
-					fmt::print("[VIF{}] ITOP: ITOP = {:#x}\n", vif, regs.itop);
-					break;
-				}
-				case 0x5:
-				{
-					regs.mode = imm & 0x3;
-					fmt::print("[VIF{}] STMOD: MODE = {:#x}\n", vif, regs.mode);
-					break;
-				}
-				case 0x6:
-				{
-					/* This is a NOP for now */
-					fmt::print("[VIF{}] MSKPATH3\n", vif);
-					break;
-				}
-				case 0x7:
-				{
-					regs.mark = imm;
-					fmt::print("[VIF{}] MARK: MARK = {:#x}\n", vif, imm);
-					break;
-				}
-				case 0x20:
-				{
-					data_remaining = 1;
-					break;
-				}
-				case 0x30:
-				{
-					data_remaining = 4;
-					fmt::print("[VIF{}] STROW: ", vif);
-					break;
-				}
-				case 0x31:
-				{
-					data_remaining = 4;
-					fmt::print("[VIF{}] STCOL: ", vif);
-					break;
-				}
-				default:
-					fmt::print("[VIF{}] Uknown fifo command {:#x}\n", vif, command);
-				}
-			}
+			if (!subpacket_count)
+				process_command();
 			else
-			{
-				switch (command)
-				{
-				case 0x20:
-				{
-					regs.mask = packet;
-					fmt::print("[VIF{}] STMASK: MASK = {:#x}", vif, packet);
-					break;
-				}
-				case 0x30:
-				{
-					regs.rn[4 - data_remaining] = packet;
-					fmt::print("RN[{}] = {:#x} ", 4 - data_remaining, packet);
-					break;
-				}
-				case 0x31:
-				{
-					regs.cn[4 - data_remaining] = packet;
-					fmt::print("CN[{}] = {:#x} ", 4 - data_remaining, packet);
-					break;
-				}
-				}
+				execute_command();
+		}
+	}
 
-				data_remaining--;
-				if (!data_remaining)
-				{
-					fmt::print("\n");
-				}
+	void VIF::reset()
+	{
+		/* Reset all the VIF registers */
+		*this = VIF(emulator, id);
+	}
+
+	uint32_t VIF::read(uint32_t address)
+	{
+		auto offset = (address >> 4) & 0xf;
+		uint32_t data = 0;
+		switch (offset)
+		{
+		case 0:
+			data = status.value;
+			break;
+		default:
+			fmt::print("[VIF{}] Writing {:#x} to unknown register {}\n", id, data, VIF_REGS[offset]);
+			std::abort();
+		}
+
+		fmt::print("[VIF{}] Reading {:#x} from {}\n", id, data, VIF_REGS[offset]);
+		return data;
+	}
+
+	void VIF::write(uint32_t address, uint32_t data)
+	{
+		auto offset = (address >> 4) & 0xf;
+		switch (offset)
+		{
+		case 0:
+			/* Only the FDR bit in status is writable */
+			status.fifo_detection = data & 0x800000;
+			break;
+		case 1:
+			fbrst.value = data;
+			break;
+		case 2:
+			err = data;
+			break;
+		case 3:
+			mark = data;
+			status.mark = 0;
+			break;
+		default:
+			fmt::print("[VIF{}] Writing {:#x} to unknown register {}\n", id, data, VIF_REGS[offset]);
+			std::abort();
+		}
+
+		fmt::print("[VIF{}] Writing {:#x} to {}\n", id, data, VIF_REGS[offset]);
+	}
+
+	void VIF::process_command()
+	{
+		if (fifo.read(&command.value))
+		{
+			auto immediate = command.immediate;
+			switch (command.command)
+			{
+			case VIFCommands::NOP:
+				fmt::print("[VIF{}] NOP\n", id);
+				break;
+			case VIFCommands::STCYCL:
+				cycle.value = immediate;
+				fmt::print("[VIF{}] STCYCL: CYCLE = {:#x}\n", id, immediate);
+				break;
+			case VIFCommands::OFFSET:
+				ofst = immediate & 0x3ff;
+				status.double_buffer_flag = 0;
+				base = tops;
+				fmt::print("[VIF{}] OFFSET: OFST = {:#x} BASE = TOPS = {:#x}\n", id, ofst, tops);
+				break;
+			case VIFCommands::BASE:
+				base = immediate & 0x3ff;
+				fmt::print("[VIF{}] BASE: BASE = {:#x}\n", id, base);
+				break;
+			case VIFCommands::ITOP:
+				itop = immediate & 0x3ff;
+				fmt::print("[VIF{}] ITOP: ITOP = {:#x}\n", id, itop);
+				break;
+			case VIFCommands::STMOD:
+				mode = immediate & 0x3;
+				fmt::print("[VIF{}] STMOD: MODE = {:#x}\n", id, mode);
+				break;
+			case VIFCommands::MSKPATH3:
+				fmt::print("[VIF{}] MSKPATH3\n", id);
+				/* TODO */
+				break;
+			case VIFCommands::MARK:
+				mark = immediate;
+				fmt::print("[VIF{}] MARK: MARK = {:#x}\n", id, mark);
+				break;
+			case VIFCommands::FLUSHE:
+				fmt::print("[VIF{}] FLUSHE\n", id);
+				break;
+			case VIFCommands::STMASK:
+				subpacket_count = 1;
+				fmt::print("[VIF{}] STMASK\n", id);
+				break;
+			case VIFCommands::STROW:
+				subpacket_count = 4;
+				fmt::print("[VIF{}] STROW:\n", id);
+				break;
+			case VIFCommands::STCOL:
+				subpacket_count = 4;
+				fmt::print("[VIF{}] STCOL:\n", id);
+				break;
+			case VIFCommands::MPG: /* TODO: Account for VU stalls */
+				/* NOTE: Since MPG tranfers instructions NUM is measured in dwords */
+				subpacket_count = command.num != 0 ? command.num * 2 : 512;
+				address = command.immediate * 8;
+				fmt::print("[VIF{0}] MPG: Trasfering {1} words to VU{0}\n", id, subpacket_count);
+				break;
+			case VIFCommands::UNPACKSTART ... VIFCommands::UNPACKEND:
+				process_unpack();
+				break;
+			default:
+				fmt::print("[VIF{}] Unkown VIF command {:#x}\n", id, (uint16_t)command.command);
+				std::abort();
 			}
+
+			fifo.pop<uint32_t>();
+		}
+	}
+
+	void VIF::process_unpack()
+	{
+		/* Compute address of unpack transfer */
+		address = command.address * 16;
+		address += command.flg ? tops * 16 : 0;
+
+		/* Compute the input to unpack ratio, how many input bits are unpacked
+		   into a single qword. This depends on the unpack format 
+		   EE User's Manual [123] */
+		auto bit_size = (32 >> command.vl) * (command.vn + 1);
+		auto word_count = ((bit_size + 0x1f) & ~0x1f) / 32;
+		subpacket_count = word_count * command.num;
+		write_mode = cycle.cycle_length < cycle.write_cycle_length ? WriteMode::Filling : WriteMode::Skipping;
+
+		/* Add some asserts for unimplemented stuff */
+		assert(!mode);
+		assert(cycle.cycle_length >= cycle.write_cycle_length);
+		
+		fmt::print("[VIF{}] UNPACK {} of {:d} words of data\n", id, UNPACK_FORMATS[command.vl][command.vn], subpacket_count);
+	}
+
+	void VIF::execute_command()
+	{
+		/* Read command data from the FIFO */
+		uint32_t data; 
+		if (fifo.read(&data))
+		{
+			switch (command.command)
+			{
+			case VIFCommands::STMASK:
+				mask = data;
+				fmt::print("MASK = {:#x}\n", mask);
+				break;
+			case VIFCommands::STROW:
+				rn[4 - subpacket_count] = data;
+				fmt::print("RN[{}] = {:#x} ", 4 - subpacket_count, data);
+				break;
+			case VIFCommands::STCOL:
+				cn[4 - subpacket_count] = data;
+				fmt::print("CN[{}] = {:#x} ", 4 - subpacket_count, data);
+				break;
+			case VIFCommands::MPG:
+				assert(id);
+				emulator->vu[id]->write(address, data);
+				fmt::print("[VIF{0}] Transfering {1:#x} to VU{0} address {2:#x}\n", id, data, address);
+				address += 4;
+				break;
+			case VIFCommands::UNPACKSTART ... VIFCommands::UNPACKEND:
+				unpack_packet();
+				return; /* Important, to skip the fifo pop below! */
+			}
+
+			subpacket_count--;
+			fifo.pop<uint32_t>();
+		}
+	}
+
+	void VIF::unpack_packet()
+	{
+		auto format = command.command & 0xf;
+		uint128_t qword = 0;
+		switch (format)
+		{
+		case VIFUFormat::V4_32:
+		{
+			/* Fill the qword with the input data */
+			if (fifo.read(&qword))
+			{
+				subpacket_count -= 4;
+				word_cycles = word_cycles >= 4 ? word_cycles - 3 : 0;
+				fifo.pop<uint128_t>();
+				break;
+			}
+
+			return;
+		}
+		default:
+			fmt::print("[VIF{}] Unknown UNPACK format {:#b}\n", id, format);
+			std::abort();
+		}
+
+		/* TODO: Apply masking/mode settings */
+
+		/* Write qword to VU mem */
+		emulator->vu[id]->write<uint128_t>(address, qword);
+
+		address += 16;
+		qwords_written++;
+
+		if (write_mode == WriteMode::Skipping)
+		{
+			/* Skip, skip, skip... */
+			if (qwords_written >= cycle.cycle_length)
+				address += (cycle.cycle_length - qwords_written) * 16;
+		}
+		else
+		{
+			/* NOP */
+			std::abort();
 		}
 	}
 }

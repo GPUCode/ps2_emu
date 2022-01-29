@@ -1,5 +1,5 @@
 #include <cpu/ee/ee.h>
-#include <cpu/vu/vu0.h>
+#include <cpu/vu/vu.h>
 #include <common/emulator.h>
 #include <fmt/color.h>
 #include <unordered_map>
@@ -1284,7 +1284,7 @@ namespace ee
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = offset + gpr[base].word[0];
-        write<uint128_t>(vaddr, emulator->vu0->regs.vf[ft].qword);
+        write<uint128_t>(vaddr, emulator->vu[0]->regs.vf[ft].qword);
 
         log("SQC2: Writing VF[{}] to address {:#x}\n", ft, vaddr);
     }
@@ -1394,7 +1394,7 @@ namespace ee
 
     void EmotionEngine::op_cop2()
     {
-        auto& vu0 = emulator->vu0;
+        auto& vu0 = emulator->vu[0];
 
         uint32_t fmt = (instr.value >> 21) & 0x1f;
         switch (fmt)

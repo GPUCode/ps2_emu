@@ -5,7 +5,7 @@
 #include <cpu/ee/dmac.h>
 #include <cpu/iop/iop.h>
 #include <cpu/iop/intr.h>
-#include <cpu/vu/vu0.h>
+#include <cpu/vu/vu.h>
 #include <cpu/vu/vif.h>
 #include <gs/gif.h>
 #include <gs/gs.h>
@@ -35,8 +35,10 @@ namespace common
         gif = std::make_unique<gs::GIF>(this);
         gs = std::make_unique<gs::GraphicsSynthesizer>(this);
         dmac = std::make_unique<ee::DMAController>(this);
-        vu0 = std::make_unique<vu::VU0>(ee.get());
-        vif = std::make_unique<vu::VIF>(this);
+        vu[0] = std::make_unique<vu::VectorUnit>(ee.get());
+        vu[1] = std::make_unique<vu::VectorUnit>(ee.get());
+        vif[0] = std::make_unique<vu::VIF>(this, 0);
+        vif[1] = std::make_unique<vu::VIF>(this, 1);
         ipu = std::make_unique<media::IPU>(this);
         sif = std::make_unique<common::SIF>(this);
         spu2 = std::make_unique<spu::SPU>(this);
@@ -104,6 +106,8 @@ namespace common
             /* Tick bus components */
             cycles /= 2;
             dmac->tick(cycles);
+            vif[0]->tick(cycles);
+            vif[1]->tick(cycles);
 
             /* Tick IOP components */
             cycles /= 4;

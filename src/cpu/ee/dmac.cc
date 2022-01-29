@@ -4,6 +4,7 @@
 #include <cpu/iop/iop.h>
 #include <common/sif.h>
 #include <gs/gif.h>
+#include <cpu/vu/vif.h>
 #include <cassert>
 
 inline uint32_t get_channel(uint32_t value)
@@ -180,6 +181,20 @@ namespace ee
 						/* This is channel specific */
 						switch (id)
 						{
+						case DMAChannels::VIF1:
+						{
+							auto& vif1 = emulator->vif[1];
+							uint128_t qword = *(uint128_t*)&emulator->ee->ram[channel.address];
+							if (vif1->write_fifo(NULL, qword))
+							{
+								uint64_t upper = qword >> 64, lower = qword;
+								fmt::print("[DMAC][VIF1] Writing {:#x}{:016x} to VIF1\n", upper, lower);
+
+								channel.address += 16;
+								channel.qword_count--;
+							}
+							break;
+						}
 						case DMAChannels::GIF:
 						{
 							auto& gif = emulator->gif;
@@ -282,6 +297,49 @@ namespace ee
 		auto& channel = channels[id];
 		switch (id)
 		{
+		case DMAChannels::VIF1:
+		{
+			assert(channel.control.mode == 1);
+			assert(!channel.tag_address.mem_select);
+
+			auto& vif1 = emulator->vif[1];
+			auto address = channel.tag_address.address;
+
+			tag.value = *(uint128_t*)&emulator->ee->ram[address];
+			fmt::print("[DMAC] Read VIF1 DMA tag {:#x}\n", (uint64_t)tag.value);
+
+			/* Transfer the tag before any data */
+			if (channel.control.transfer_tag && !vif1->write_fifo<uint64_t>(NULL, tag.data))
+				return;
+
+			/* Update channel from tag */
+			channel.qword_count = tag.qwords;
+			channel.control.tag = (tag.value >> 16) & 0xffff;
+
+			uint16_t tag_id = tag.id;
+			switch (tag_id)
+			{
+			case DMASourceID::CNT:
+				channel.address = channel.tag_address.address + 16;
+				channel.tag_address.value = channel.address + channel.qword_count * 16;
+				break;
+			case DMASourceID::NEXT:
+				channel.address = channel.tag_address.address + 16;
+				channel.tag_address.address = tag.address;
+				break;
+			default:
+				fmt::print("\n[DMAC] Unrecognized VIF1 DMAtag id {:d}\n", tag_id);
+				std::abort();
+			}
+
+			if (channel.control.enable_irq_bit && tag.irq)
+			{
+				/* Just end transfer, since an interrupt will be raised there anyways */
+				channel.end_transfer = true;
+			}
+
+			break;
+		}
 		case DMAChannels::SIF0:
 		{
 			auto& sif = emulator->sif;
@@ -305,16 +363,17 @@ namespace ee
 
 				fmt::print("[DMAC] QWC: {:d}\nADDR: {:#x}\n", channel.qword_count, channel.address);
 
+				/* Just end transfer, since an interrupt will be raised there anyways */
 				if (channel.control.enable_irq_bit && tag.irq)
-				{
-					/* Just end transfer, since an interrupt will be raised there anyways */
 					channel.end_transfer = true;
-				}
 			}
 			break;
 		}
 		case DMAChannels::SIF1:
 		{
+			assert(channel.control.mode == 1);
+			assert(!channel.tag_address.mem_select);
+
 			auto address = channel.tag_address.address;
 
 			/* Get tag from memory */
@@ -357,8 +416,6 @@ namespace ee
 				fmt::print("\n[DMAC] Unrecognized SIF1 DMAtag id {:d}\n", tag_id);
 				std::abort();
 			}
-
-			assert(channel.tag_address.mem_select == 0);
 
 			if (channel.control.enable_irq_bit && tag.irq)
 			{

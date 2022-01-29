@@ -1,5 +1,7 @@
 #pragma once
 #include <common/component.h>
+#include <queue>
+#include <utils/queue.h>
 
 namespace common
 {
@@ -33,48 +35,107 @@ namespace vu
 
 	union VIFFBRST
 	{
-		uint32_t value = 0;
+		uint8_t value = 0;
 		struct
 		{
-			uint32_t reset : 1;
-			uint32_t force_break : 1;
-			uint32_t stop_vif : 1;
-			uint32_t stall_cancel : 1;
+			uint8_t reset : 1;
+			uint8_t force_break : 1;
+			uint8_t stop_vif : 1;
+			uint8_t stall_cancel : 1;
 		};
 	};
 
 	union VIFCYCLE
 	{
-		uint32_t value;
+		uint16_t value;
 		struct
 		{
-			uint32_t cycle_length : 8;
-			uint32_t write_cycle_length : 8;
-			uint32_t : 16;
+			uint16_t cycle_length : 8;
+			uint16_t write_cycle_length : 8;
 		};
 	};
 
-	struct VIFRegs
+	union VIFCommand
 	{
-		VIFSTAT status;
-		VIFFBRST fbrst;
-		uint32_t err;
-		uint32_t mark;
-		VIFCYCLE cycle;
-		uint32_t mode;
-		uint32_t num;
-		uint32_t mask;
-		uint32_t code;
-		uint32_t itops;
-		/* These only on exist on VIF1,
-		   but I add them as padding on VIF0 */
-		uint32_t base;
-		uint32_t ofst;
-		uint32_t tops;
-		uint32_t itop;
-		uint32_t top;
-		uint32_t rn[4];
-		uint32_t cn[4];
+		uint32_t value;
+		struct
+		{
+			union
+			{
+				uint16_t immediate;
+				struct
+				{
+					uint16_t address : 10;
+					uint16_t : 4;
+					uint16_t sign_extend : 1;
+					uint16_t flg : 1;
+				};
+			};
+			/* The NUM field stores the subpacket length. However depending on whether
+			   the operation writes data or instructions to the VU its meaning can change.
+			   In data transfer operations the field is in qwords while in instruction
+			   transfers it's in dwords. */
+			uint8_t num;
+			union
+			{
+				uint8_t command;
+				struct
+				{
+					uint8_t vl : 2;
+					uint8_t vn : 2;
+					uint8_t mask : 1;
+				};
+			};
+		};
+	};
+
+	enum VIFCommands
+	{
+		NOP = 0x0,
+		STCYCL = 0x1,
+		OFFSET = 0x2,
+		BASE = 0x3,
+		ITOP = 0x4,
+		STMOD = 0x5,
+		MSKPATH3 = 0x6,
+		MARK = 0x7,
+		FLUSHE = 0x10,
+		FLUSH = 0x11,
+		FLUSHA = 0x13,
+		MSCAL = 0x14,
+		MSCALF = 0x15,
+		MSCNT = 0x17,
+		STMASK = 0x20,
+		STROW = 0x30,
+		STCOL = 0x31,
+		MPG = 0x4a,
+		DIRECT = 0x50,
+		DIRECTHL = 0x51,
+		UNPACKSTART = 0x60,
+		UNPACKEND = 0x7f
+	};
+
+	enum VIFUFormat
+	{
+		S_32 = 0,
+		S_16 = 1,
+		S_8 = 2,
+		V2_32 = 4,
+		V2_16 = 5,
+		V2_8 = 6,
+		V3_32 = 8,
+		V3_16 = 9,
+		V3_8 = 10,
+		V4_32 = 12,
+		V4_16 = 13,
+		V4_8 = 14,
+		V4_5 = 15
+	};
+
+	enum WriteMode : bool
+	{
+		Skipping = 0,
+		Filling = 1,
 	};
 
 	/* Technically there are two VIFs (VIF0/VIF1) but 
@@ -82,16 +143,54 @@ namespace vu
 	   merging them in a single class */
 	struct VIF : public common::Component
 	{
-		VIF(common::Emulator* parent);
+		VIF(common::Emulator* parent, int N);
 		~VIF() = default;
 
-		uint32_t read(uint32_t addr);
-		void write(uint32_t addr, uint32_t data);
+		void tick(uint32_t cycles);
+		void reset();
 
-		void write_fifo(uint32_t addr, uint128_t data);
+		template <typename T>
+		bool write_fifo(uint32_t, T data);
+
+		uint32_t read(uint32_t address);
+		void write(uint32_t address, uint32_t data);
+
+	private:
+		void process_command();
+		void process_unpack();
+
+		void execute_command();
+		void unpack_packet();
 
 	private:
 		common::Emulator* emulator;
-		VIFRegs registers[2] = {};
+		int id;
+
+		/* VIF registers */
+		VIFSTAT status = {};
+		VIFFBRST fbrst = {};
+		uint32_t err = 0, mark = 0;
+		VIFCYCLE cycle;
+		uint32_t mode = 0, num = 0;
+		uint32_t mask = 0, code = 0, itops = 0;
+		/* These only on exist on VIF1 */
+		uint32_t base = 0, ofst = 0;
+		uint32_t tops = 0, itop = 0, top = 0;
+		uint32_t rn[4] = {}, cn[4] = {};
+
+		/* VIF FIFO */
+		util::Queue<uint32_t, 256> fifo;
+		WriteMode write_mode = WriteMode::Skipping;
+
+		/* These is set by commands that expect data packets */
+		VIFCommand command = {};
+		uint32_t subpacket_count = 0, address = 0;
+		uint32_t qwords_written = 0, word_cycles = 0;
 	};
+	
+	template<typename T>
+	inline bool VIF::write_fifo(uint32_t, T data)
+	{
+		return fifo.push<T>(data);
+	}
 }

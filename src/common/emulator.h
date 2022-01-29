@@ -1,7 +1,7 @@
 #pragma once
 #include <common/component.h>
 #include <cpu/iop/dma.h>
-#include <cpu/vu/vu0.h>
+#include <cpu/vu/vu.h>
 #include <fmt/format.h>
 #include <memory>
 #include <fstream>
@@ -26,7 +26,7 @@ namespace gs
 
 namespace vu
 {
-    struct VU0;
+    struct VectorUnit;
     struct VIF;
 }
 
@@ -107,8 +107,8 @@ namespace common
         std::unique_ptr<gs::GIF> gif;
         std::unique_ptr<gs::GraphicsSynthesizer> gs;
         std::unique_ptr<ee::DMAController> dmac;
-        std::unique_ptr<vu::VU0> vu0;
-        std::unique_ptr<vu::VIF> vif;
+        std::unique_ptr<vu::VectorUnit> vu[2];
+        std::unique_ptr<vu::VIF> vif[2];
         std::unique_ptr<media::IPU> ipu;
         std::unique_ptr<common::SIF> sif;
         std::unique_ptr<spu::SPU> spu2;
@@ -161,7 +161,7 @@ namespace common
     {
         if (paddr >= 0x11000000 && paddr < 0x11008000)
         {
-            vu0->write(paddr, data);
+            vu[0]->write(paddr, data);
         }
         else if (paddr >= 0x1fff8000 && paddr < 0x20000000)
         {

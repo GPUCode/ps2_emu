@@ -1,17 +1,17 @@
-#include <cpu/vu/vu0.h>
+#include <cpu/vu/vu.h>
 #include <cpu/ee/ee.h>
 #include <fmt/core.h>
 
 namespace vu
 {
-	VU0::VU0(ee::EmotionEngine* parent) :
+	VectorUnit::VectorUnit(ee::EmotionEngine* parent) :
 		cpu(parent)
 	{
 		/* W = 1.0f on VF00 */
 		regs.vf[0].w = 1.0f;
 	}
 
-	void VU0::special1(ee::Instruction instr)
+	void VectorUnit::special1(ee::Instruction instr)
 	{
 		uint32_t function = instr.value & 0x3f;
 		VUInstr vu_instr = { .value = instr.value };
@@ -27,7 +27,7 @@ namespace vu
 		}
 	}
 
-	void VU0::special2(ee::Instruction instr)
+	void VectorUnit::special2(ee::Instruction instr)
 	{
 		uint32_t flo = instr.value & 0x3;
 		uint32_t fhi = (instr.value >> 6) & 0x1f;
@@ -48,7 +48,7 @@ namespace vu
 		}
 	}
 
-	void VU0::op_cfc2(ee::Instruction instr)
+	void VectorUnit::op_cfc2(ee::Instruction instr)
 	{
 		uint16_t id = instr.r_type.rd;
 		uint16_t rt = instr.r_type.rt;
@@ -58,7 +58,7 @@ namespace vu
 		fmt::print("[VU0] CFC2: GPR[{}] = VI[{}] ({:#x})\n", rt, id, *ptr);
 	}
 	
-	void VU0::op_ctc2(ee::Instruction instr)
+	void VectorUnit::op_ctc2(ee::Instruction instr)
 	{
 		uint16_t id = instr.r_type.rd;
 		uint16_t rt = instr.r_type.rt;
@@ -68,7 +68,7 @@ namespace vu
 		fmt::print("[VU0] CTC2: VI[{}] = GPR[{}] ({:#x})\n", id, rt, *ptr);
 	}
 
-	void VU0::op_qmfc2(ee::Instruction instr)
+	void VectorUnit::op_qmfc2(ee::Instruction instr)
 	{
 		uint16_t fd = instr.r_type.rd;
 		uint16_t rt = instr.r_type.rt;
@@ -78,7 +78,7 @@ namespace vu
 		fmt::print("[VU0] QMFC2: GPR[{}] = VF[{}] ({:#x}{:016x})\n", rt, fd, upper, (uint64_t)regs.vf[fd].qword);
 	}
 
-	void VU0::op_qmtc2(ee::Instruction instr)
+	void VectorUnit::op_qmtc2(ee::Instruction instr)
 	{
 		uint16_t fd = instr.r_type.rd;
 		uint16_t rt = instr.r_type.rt;
@@ -88,7 +88,7 @@ namespace vu
 		fmt::print("[VU0] QMTC2:  VF[{}] = GPR[{}] ({:#x}{:016x})\n", fd, rt, upper, (uint64_t)cpu->gpr[rt].qword);
 	}
 
-	void VU0::op_viswr(VUInstr instr)
+	void VectorUnit::op_viswr(VUInstr instr)
 	{
 		uint16_t is = instr.is;
 		uint16_t it = instr.it;
@@ -115,7 +115,7 @@ namespace vu
 		fmt::print("\b\b)\n");
 	}
 	
-	void VU0::op_vsub(VUInstr instr)
+	void VectorUnit::op_vsub(VUInstr instr)
 	{
 		uint16_t fd = instr.fd;
 		uint16_t fs = instr.fs;
@@ -134,7 +134,7 @@ namespace vu
 		fmt::print("\b\b)\n");
 	}
 	
-	void VU0::op_vsqi(VUInstr instr)
+	void VectorUnit::op_vsqi(VUInstr instr)
 	{
 		uint16_t fs = instr.fs;
 		uint16_t it = instr.it;
@@ -161,7 +161,7 @@ namespace vu
 		regs.vi[it]++;
 	}
 	
-	void VU0::op_viadd(VUInstr instr)
+	void VectorUnit::op_viadd(VUInstr instr)
 	{
 		uint16_t id = instr.id;
 		uint16_t is = instr.is;
@@ -171,7 +171,7 @@ namespace vu
 		regs.vi[id] = regs.vi[is] + regs.vi[it];
 	}
 
-	void VU0::op_vsuba(VUInstr instr)
+	void VectorUnit::op_vsuba(VUInstr instr)
 	{
 		uint16_t fs = instr.fs;
 		uint16_t ft = instr.ft;
@@ -189,7 +189,7 @@ namespace vu
 		fmt::print("\b\b)\n");
 	}
 	
-	void VU0::op_vmadda(VUInstr instr)
+	void VectorUnit::op_vmadda(VUInstr instr)
 	{
 		uint16_t fs = instr.fs;
 		uint16_t ft = instr.ft;
@@ -207,7 +207,7 @@ namespace vu
 		fmt::print("\b\b)\n");
 	}
 	
-	void VU0::op_vmsuba(VUInstr instr)
+	void VectorUnit::op_vmsuba(VUInstr instr)
 	{
 		uint16_t fs = instr.fs;
 		uint16_t ft = instr.ft;
@@ -225,7 +225,7 @@ namespace vu
 		fmt::print("\b\b)\n");
 	}
 
-	void VU0::op_vitof0(VUInstr instr)
+	void VectorUnit::op_vitof0(VUInstr instr)
 	{
 		uint16_t fs = instr.fs;
 		uint16_t ft = instr.ft;
@@ -243,7 +243,7 @@ namespace vu
 		fmt::print("\b\b)\n");
 	}
 
-	void VU0::op_vadd(VUInstr instr)
+	void VectorUnit::op_vadd(VUInstr instr)
 	{
 		uint16_t fd = instr.fd;
 		uint16_t fs = instr.fs;
@@ -262,7 +262,7 @@ namespace vu
 		fmt::print("\b\b)\n");
 	}
 
-	void VU0::op_vmr32(VUInstr instr)
+	void VectorUnit::op_vmr32(VUInstr instr)
 	{
 		uint16_t fs = instr.fs;
 		uint16_t ft = instr.ft;
