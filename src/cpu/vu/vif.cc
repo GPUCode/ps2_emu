@@ -195,6 +195,9 @@ namespace vu
 		subpacket_count = word_count * command.num;
 		write_mode = cycle.cycle_length < cycle.write_cycle_length ? WriteMode::Filling : WriteMode::Skipping;
 
+		/* Clear the qword counter */
+		qwords_written = 0;
+
 		/* Add some asserts for unimplemented stuff */
 		assert(!mode);
 		assert(cycle.cycle_length >= cycle.write_cycle_length);
@@ -251,6 +254,8 @@ namespace vu
 			{
 				uint32_t* words = (uint32_t*)&qword;
 				words[0] = words[1] = words[2] = words[3] = data;
+				
+				subpacket_count--;
 				fifo.pop<uint32_t>();
 				break;
 			}

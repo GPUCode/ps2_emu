@@ -181,17 +181,21 @@ namespace ee
 						/* This is channel specific */
 						switch (id)
 						{
+						case DMAChannels::VIF0:
 						case DMAChannels::VIF1:
 						{
-							auto& vif1 = emulator->vif[1];
+							auto& vif = emulator->vif[id];
 							uint128_t qword = *(uint128_t*)&emulator->ee->ram[channel.address];
-							if (vif1->write_fifo(NULL, qword))
+							if (vif->write_fifo(NULL, qword))
 							{
 								uint64_t upper = qword >> 64, lower = qword;
-								fmt::print("[DMAC][VIF1] Writing {:#x}{:016x} to VIF1\n", upper, lower);
+								fmt::print("[DMAC] Writing {:#x}{:016x} to VIF{}\n", upper, lower, id);
 
 								channel.address += 16;
 								channel.qword_count--;
+
+								if (!channel.qword_count && !channel.control.mode)
+									channel.end_transfer = true;
 							}
 							break;
 						}
@@ -301,19 +305,19 @@ namespace ee
 		auto& channel = channels[id];
 		switch (id)
 		{
+		case DMAChannels::VIF0:
 		case DMAChannels::VIF1:
 		{
-			assert(channel.control.mode == 1);
 			assert(!channel.tag_address.mem_select);
 
-			auto& vif1 = emulator->vif[1];
+			auto& vif = emulator->vif[id];
 			auto address = channel.tag_address.address;
 
 			tag.value = *(uint128_t*)&emulator->ee->ram[address];
-			fmt::print("[DMAC] Read VIF1 DMA tag {:#x}\n", (uint64_t)tag.value);
+			fmt::print("[DMAC] Read VIF{} DMA tag {:#x}\n", id, (uint64_t)tag.value);
 
 			/* Transfer the tag before any data */
-			if (channel.control.transfer_tag && !vif1->write_fifo<uint64_t>(NULL, tag.data))
+			if (channel.control.transfer_tag && !vif->write_fifo<uint64_t>(NULL, tag.data))
 				return;
 
 			/* Update channel from tag */
@@ -323,6 +327,11 @@ namespace ee
 			uint16_t tag_id = tag.id;
 			switch (tag_id)
 			{
+			case DMASourceID::REFE:
+				channel.address = tag.address;
+				channel.tag_address.value += 16;
+				channel.end_transfer = true;
+				break;
 			case DMASourceID::CNT:
 				channel.address = channel.tag_address.address + 16;
 				channel.tag_address.value = channel.address + channel.qword_count * 16;
@@ -332,15 +341,13 @@ namespace ee
 				channel.tag_address.address = tag.address;
 				break;
 			default:
-				fmt::print("\n[DMAC] Unrecognized VIF1 DMAtag id {:d}\n", tag_id);
+				fmt::print("\n[DMAC] Unrecognized VIF{} DMAtag id {:d}\n", id, tag_id);
 				std::abort();
 			}
 
+			/* Just end transfer, since an interrupt will be raised there anyways  */
 			if (channel.control.enable_irq_bit && tag.irq)
-			{
-				/* Just end transfer, since an interrupt will be raised there anyways */
 				channel.end_transfer = true;
-			}
 
 			break;
 		}
@@ -394,9 +401,6 @@ namespace ee
 			{
 			case DMASourceID::REFE:
 			{
-				/* MADR=DMAtag.ADDR
-				   TADR+=16
-				   tag_end=true */
 				channel.address = tag.address;
 				channel.tag_address.value += 16;
 				channel.end_transfer = true;
@@ -410,8 +414,6 @@ namespace ee
 			}
 			case DMASourceID::REF:
 			{
-				/* MADR=DMAtag.ADDR
-				   TADR+=16 */
 				channel.address = tag.address;
 				channel.tag_address.value += 16;
 				break;
@@ -421,11 +423,9 @@ namespace ee
 				std::abort();
 			}
 
+			/* Just end transfer, since an interrupt will be raised there anyways */
 			if (channel.control.enable_irq_bit && tag.irq)
-			{
-				/* Just end transfer, since an interrupt will be raised there anyways */
 				channel.end_transfer = true;
-			}
 
 			break;
 		}

@@ -144,9 +144,9 @@ namespace common
         else if (paddr >= 0x11000000 && paddr < 0x11010000)
         {
             bool vid = paddr & 0x8000;
-            bool data = paddr & 0x4000;
+            bool memory = paddr & 0x4000;
 
-            if (data)
+            if (memory)
                 return vu[vid]->read<vu::Memory::Data, T>(paddr);
             else
                 return vu[vid]->read<vu::Memory::Code, T>(paddr);
@@ -171,9 +171,9 @@ namespace common
         if (paddr >= 0x11000000 && paddr < 0x11010000)
         {
             bool vid = paddr & 0x8000;
-            bool data = paddr & 0x4000;
+            bool memory = paddr & 0x4000;
             
-            if (data)
+            if (memory)
                 vu[vid]->write<vu::Memory::Data>(paddr, data);
             else
                 vu[vid]->write<vu::Memory::Code>(paddr, data);
