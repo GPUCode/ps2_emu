@@ -317,8 +317,11 @@ namespace ee
 			fmt::print("[DMAC] Read VIF{} DMA tag {:#x}\n", id, (uint64_t)tag.value);
 
 			/* Transfer the tag before any data */
-			if (channel.control.transfer_tag && !vif->write_fifo<uint64_t>(NULL, tag.data))
-				return;
+			if (channel.control.transfer_tag)
+			{
+				if (!vif->write_fifo<uint64_t>(NULL, tag.data))
+					return;
+			}
 
 			/* Update channel from tag */
 			channel.qword_count = tag.qwords;
