@@ -136,59 +136,68 @@ namespace common
     template <typename T, ComponentID id>
     inline T Emulator::read(uint32_t paddr)
     {
-        if (paddr >= 0x1fc00000) /* Read BIOS */
+        /* Read BIOS */
+        if (paddr >= 0x1fc00000)
         {
             return *(T*)&bios[paddr - 0x1fc00000];
-        }
-        else /* Otherwise handle specific address diferently. */
+        } /* Handle VU writes */
+        else if (paddr >= 0x11000000 && paddr < 0x11010000)
         {
-            auto page = Emulator::calculate_page(paddr);
-            auto handler = (Handler<T>*)handlers[page];
+            bool vid = paddr & 0x8000;
+            bool data = paddr & 0x4000;
 
-            if (handler)
-            {
-                return (*handler)(paddr);
-            }
+            if (data)
+                return vu[vid]->read<vu::Memory::Data, T>(paddr);
             else
-            {
-                fmt::print("[{}] {:d}bit read from unknown address {:#x}\n", component_name[id], sizeof(T) * 8, paddr);
-                return 0;
-            }
+                return vu[vid]->read<vu::Memory::Code, T>(paddr);
         }
+
+        /* Otherwise handle specific address diferently. */
+        auto page = Emulator::calculate_page(paddr);
+        auto handler = (Handler<T>*)handlers[page];
+
+        if (handler)
+            return (*handler)(paddr);
+            
+        fmt::print("[{}] {:d}bit read from unknown address {:#x}\n", component_name[id], sizeof(T) * 8, paddr);
+        return 0;
     }
 
     /* Instanciate the templates here so we can limit their types below */
     template <typename T, ComponentID id>
     inline void Emulator::write(uint32_t paddr, T data)
     {
-        if (paddr >= 0x11000000 && paddr < 0x11008000)
+        /* Handle VU writes */
+        if (paddr >= 0x11000000 && paddr < 0x11010000)
         {
-            vu[0]->write(paddr, data);
-        }
+            bool vid = paddr & 0x8000;
+            bool data = paddr & 0x4000;
+            
+            if (data)
+                vu[vid]->write<vu::Memory::Data>(paddr, data);
+            else
+                vu[vid]->write<vu::Memory::Code>(paddr, data);
+
+            return;
+        } /* Allow writing to the upper region of the BIOS */
         else if (paddr >= 0x1fff8000 && paddr < 0x20000000)
         {
             *(T*)&bios[paddr & 0x3fffff] = data;
+            return;
         }
+
+        /* Otherwise handle specific address diferently. */
+        auto page = Emulator::calculate_page(paddr);
+        auto handler = (Handler<T>*)handlers[page];
+
+        if (handler)
+            return (*handler)(paddr, data);
+
+        /* 128bit writes are not supported by fmt sadly */
+        if constexpr (std::is_same<T, uint128_t>::value)
+            fmt::print("[{}] {:d}bit write {:#x}{:016x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, (uint64_t)(data >> 64), (uint64_t)data, paddr);
         else
-        {
-            auto page = Emulator::calculate_page(paddr);
-            auto handler = (Handler<T>*)handlers[page];
-
-            if (handler)
-            {
-                return (*handler)(paddr, data);
-            }
-
-            if constexpr (std::is_same<T, uint128_t>::value)
-            {
-                uint64_t upper = (data >> 64);
-                fmt::print("[{}] {:d}bit write {:#x}{:016x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, upper, (uint64_t)data, paddr);
-            }
-            else
-            {
-                fmt::print("[{}] {:d}bit write {:#x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, data, paddr);
-            }
-        }
+            fmt::print("[{}] {:d}bit write {:#x} to unknown address {:#x}\n", component_name[id], sizeof(T) * 8, data, paddr);
     }
     
     template <typename T, typename R, typename W>

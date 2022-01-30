@@ -33,7 +33,7 @@ add_executable(${PROJECT_NAME}
 	"src/media/sio2.cc"
 	"src/media/gamepad.cc"
 	"src/gs/gsvram.cc"
- "src/utils/queue.h")
+)
 
 # Link to all the required conan libs
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)

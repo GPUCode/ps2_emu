@@ -224,7 +224,7 @@ namespace vu
 				break;
 			case VIFCommands::MPG:
 				assert(id);
-				emulator->vu[id]->write(address, data);
+				emulator->vu[id]->write<vu::Memory::Code>(address, data);
 				fmt::print("[VIF{0}] Transfering {1:#x} to VU{0} address {2:#x}\n", id, data, address);
 				address += 4;
 				break;
@@ -244,6 +244,18 @@ namespace vu
 		uint128_t qword = 0;
 		switch (format)
 		{
+		case VIFUFormat::S_32:
+		{
+			uint32_t data;
+			if (fifo.read(&data))
+			{
+				uint32_t* words = (uint32_t*)&qword;
+				words[0] = words[1] = words[2] = words[3] = data;
+				fifo.pop<uint32_t>();
+				break;
+			}
+			return;
+		}
 		case VIFUFormat::V4_32:
 		{
 			/* Fill the qword with the input data */
@@ -265,7 +277,7 @@ namespace vu
 		/* TODO: Apply masking/mode settings */
 
 		/* Write qword to VU mem */
-		emulator->vu[id]->write<uint128_t>(address, qword);
+		emulator->vu[id]->write<vu::Memory::Data>(address, qword);
 
 		address += 16;
 		qwords_written++;
