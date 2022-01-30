@@ -11,6 +11,9 @@ constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasi
 #define log(...) if (print_pc) fmt::print(disassembly, __VA_ARGS__)
 #endif
 
+constexpr const char* TEST_ELF = "tests/cpu/ee/muldiv.elf";
+bool load_elf = false;
+
 namespace ee
 {
     EmotionEngine::EmotionEngine(common::Emulator* parent) :
@@ -65,6 +68,14 @@ namespace ee
             {
                 skip_branch_delay = false;
                 log("SKIPPED delay slot\n");
+                continue;
+            }
+
+            /* HACK. Used to load test elfs */
+            if (instr.pc < 0x80000000 && instr.pc >= 0x00100000 && load_elf)
+            {
+                emulator->load_elf(TEST_ELF);
+                load_elf = false;
                 continue;
             }
 
@@ -527,21 +538,26 @@ namespace ee
         uint16_t rt = instr.i_type.rt;
         uint16_t rs = instr.i_type.rs;
 
-        if (gpr[rt].word[0] != 0)
-        {
-            int32_t q = (int32_t)gpr[rs].word[0] / (int32_t)gpr[rt].word[0];
-            lo0 = (int64_t)(int32_t)(q & 0xFFFFFFFF);
-        
-            int32_t r = (int32_t)gpr[rs].word[0] % (int32_t)gpr[rt].word[0];
-            hi0 = (int64_t)(int32_t)(r & 0xFFFFFFFF);
+        int32_t reg1 = gpr[rs].word[0];
+        int32_t reg2 = gpr[rt].word[0];
 
-            log("DIV: LO0 = GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x})\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0]);
-        }
-        else [[unlikely]]
+        if (reg2 == 0)
         {
-            log("[ERROR] DIV: Division by zero!\n");
-            std::abort();
+            hi0 = reg1;
+            lo0 = reg1 >= 0 ? (int32_t)0xffffffff : 1;
         }
+        else if (reg1 == 0x80000000 && reg2 == -1)
+        {
+            hi0 = 0;
+            lo0 = (int32_t)0x80000000;
+        }
+        else 
+        {
+            hi0 = (int32_t)(reg1 % reg2);
+            lo0 = (int32_t)(reg1 / reg2);
+        }
+
+        log("DIV: LO0 = GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x})\n", rs, reg1, rt, reg2);
     }
 
     void EmotionEngine::op_mfhi()
@@ -1673,7 +1689,8 @@ namespace ee
         uint16_t rs = instr.i_type.rs;
         int16_t imm = (int16_t)instr.i_type.immediate;
 
-        gpr[rt].dword[0] = gpr[rs].dword[0] + imm;
+        int32_t result = gpr[rs].dword[0] + imm;
+        gpr[rt].dword[0] = result;
 
         log("ADDIU: GPR[{:d}] = GPR[{:d}] ({:#x}) + {:#x}\n", rt, rs, gpr[rs].dword[0], imm);
     }
@@ -1784,8 +1801,8 @@ namespace ee
         uint16_t rs = instr.r_type.rs;
         uint16_t rd = instr.r_type.rd;
 
-        gpr[rd].dword[0] = pc;
         pc = gpr[rs].word[0];
+        gpr[rd].dword[0] = instr.pc + 8;
 
         next_instr.is_delay_slot = true;
         log("JALR: Jumping to PC = GPR[{:d}] ({:#x}) with link address {:#x}\n", rs, pc, gpr[rd].dword[0]);
@@ -1853,7 +1870,8 @@ namespace ee
         uint16_t rs = instr.r_type.rs;
         uint16_t rd = instr.r_type.rd;
 
-        gpr[rd].dword[0] = gpr[rs].dword[0] + gpr[rt].dword[0];
+        int32_t result = gpr[rs].dword[0] + gpr[rt].dword[0];
+        gpr[rd].dword[0] = result;
 
         log("ADDU: GPR[{:d}] = GPR[{:d}] ({:#x}) + GPR[{:d}] ({:#x})\n", rd, rs, gpr[rs].dword[0], rt, gpr[rt].dword[0]);
     }
@@ -1890,7 +1908,7 @@ namespace ee
     
         int32_t offset = imm << 2;
         if (gpr[rs].dword[0] == gpr[rt].dword[0])
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
     
         next_instr.is_delay_slot = true;
         log("BEQ: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
@@ -1928,18 +1946,18 @@ namespace ee
         uint16_t rt = instr.i_type.rt;
         uint16_t rs = instr.i_type.rs;
 
-        if (gpr[rt].word[0] != 0)
+        if (gpr[rt].word[0] == 0) 
         {
-            lo0 = (int64_t)(int32_t)(gpr[rs].word[0] / gpr[rt].word[0]);
-            hi0 = (int64_t)(int32_t)(gpr[rs].word[0] % gpr[rt].word[0]);
-        
-            log("DIVU: GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x}) OUTPUT LO0 = {:#x} and HI0 = {:#x}\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0], lo0, hi0);
+            hi0 = (int32_t)gpr[rs].word[0];
+            lo0 = (int32_t)0xffffffff;
         }
-        else [[unlikely]]
+        else 
         {
-            log("[ERROR] DIVU: Division by zero!\n");
-            std::abort();
+            hi0 = (int32_t)(gpr[rs].word[0] % gpr[rt].word[0]);
+            lo0 = (int32_t)(gpr[rs].word[0] / gpr[rt].word[0]);
         }
+
+        log("DIVU: GPR[{:d}] ({:#x}) / GPR[{:d}] ({:#x}) OUTPUT LO0 = {:#x} and HI0 = {:#x}\n", rs, gpr[rs].word[0], rt, gpr[rt].word[0], lo0, hi0);
     }
 
     void EmotionEngine::op_beql()

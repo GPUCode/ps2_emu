@@ -78,6 +78,91 @@ namespace common
         return opt_addr / HANDLER_PAGE_SIZE;
     }
 
+    bool Emulator::load_elf(const char* filename)
+    {
+        /* ELF header structure */
+        struct Elf32_Ehdr 
+        {
+            uint8_t  e_ident[16];
+            uint16_t e_type;
+            uint16_t e_machine;
+            uint32_t e_version;
+            uint32_t e_entry;
+            uint32_t e_phoff;
+            uint32_t e_shoff;
+            uint32_t e_flags;
+            uint16_t e_ehsize;
+            uint16_t e_phentsize;
+            uint16_t e_phnum;
+            uint16_t e_shentsize;
+            uint16_t e_shnum;
+            uint16_t e_shstrndx;
+        };
+
+        /* Program header */
+        struct Elf32_Phdr 
+        {
+            uint32_t p_type;
+            uint32_t p_offset;
+            uint32_t p_vaddr;
+            uint32_t p_paddr;
+            uint32_t p_filesz;
+            uint32_t p_memsz;
+            uint32_t p_flags;
+            uint32_t p_align;
+        };
+
+        std::ifstream reader;
+        reader.open(filename, std::ios::in | std::ios::binary);
+
+        if (reader.is_open())
+        {
+            reader.seekg(0, std::ios::end);
+            int size = reader.tellg();
+            uint8_t* buffer = new uint8_t[size];
+
+            reader.seekg(0, std::ios::beg);
+            reader.read((char*)buffer, size);
+            reader.close();
+            
+            auto header = *(Elf32_Ehdr*)&buffer[0];
+            fmt::print("[CORE][ELF] Loading {}\n", filename);
+            fmt::print("Entry: {:#x}\n", header.e_entry);
+            fmt::print("Program header start: {:#x}\n", header.e_phoff);
+            fmt::print("Section header start: {:#x}\n", header.e_shoff);
+            fmt::print("Program header entries: {:d}\n", header.e_phnum);
+            fmt::print("Section header entries: {:d}\n", header.e_shnum);
+            fmt::print("Section header names index: {:d}\n", header.e_shstrndx);
+
+            for (auto i = header.e_phoff; i < header.e_phoff + (header.e_phnum * 0x20); i += 0x20)
+            {
+                auto pheader = *(Elf32_Phdr*)&buffer[i];
+                fmt::print("\nProgram header\n");
+                fmt::print("p_type: {:#x}\n", pheader.p_type);
+                fmt::print("p_offset: {:#x}\n", pheader.p_offset);
+                fmt::print("p_vaddr: {:#x}\n", pheader.p_vaddr);
+                fmt::print("p_paddr: {:#x}\n", pheader.p_paddr);
+                fmt::print("p_filesz: {:#x}\n", pheader.p_filesz);
+                fmt::print("p_memsz: {:#x}\n", pheader.p_memsz);
+
+                int mem_w = pheader.p_paddr;
+                for (auto file_w = pheader.p_offset; file_w < (pheader.p_offset + pheader.p_filesz); file_w += 4)
+                {
+                    uint32_t word = *(uint32_t*)&buffer[file_w];
+                    ee->write<uint32_t>(mem_w, word);
+                    mem_w += 4;
+                }
+            }
+            
+            ee->pc = header.e_entry;
+            ee->direct_jump();
+
+            return true;
+        }
+
+        return false;
+    }
+
     void Emulator::read_bios()
     {
         /* Yes it's hardcoded for now, don't bite me, I'll change it eventually */
