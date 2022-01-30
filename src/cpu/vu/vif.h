@@ -179,7 +179,7 @@ namespace vu
 		uint32_t rn[4] = {}, cn[4] = {};
 
 		/* VIF FIFO */
-		util::Queue<uint32_t, 256> fifo;
+		util::Queue<uint32_t, 64> fifo;
 		WriteMode write_mode = WriteMode::Skipping;
 
 		/* These is set by commands that expect data packets */

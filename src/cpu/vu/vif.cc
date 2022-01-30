@@ -58,6 +58,7 @@ namespace vu
 		switch (offset)
 		{
 		case 0:
+			status.fifo_count = fifo.size<uint128_t>();
 			data = status.value;
 			break;
 		default:

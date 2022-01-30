@@ -75,8 +75,7 @@ namespace util
 		template <typename T = _Ty>
 		inline int size() const
 		{
-			constexpr int TRATIO = sizeof(T) / sizeof(_Ty);
-			return count * TRATIO;
+			return count * sizeof(_Ty) / sizeof(T);
 		}
 
 		_Ty buffer[N] = {};
