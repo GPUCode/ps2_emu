@@ -199,16 +199,20 @@ namespace ee
 						{
 							auto& gif = emulator->gif;
 							uint128_t qword = *(uint128_t*)&emulator->ee->ram[channel.address];
-							uint64_t upper = qword >> 64, lower = qword;
-							fmt::print("[DMAC][GIF] Writing {:#x}{:016x} to PATH3\n", upper, lower);
 
-							gif->write_path3(0x10006000, qword);
-							channel.address += 16;
-							channel.qword_count--;
+							/* Send data to the PATH3 port of the GIF */
+							if (gif->write_path3(NULL, qword))
+							{
+								uint64_t upper = qword >> 64, lower = qword;
+								fmt::print("[DMAC][GIF] Writing {:#x}{:016x} to PATH3\n", upper, lower);
 
-							assert(!channel.control.mode);
-							if (!channel.qword_count)
-								channel.end_transfer = true;
+								channel.address += 16;
+								channel.qword_count--;
+
+								assert(!channel.control.mode);
+								if (!channel.qword_count)
+									channel.end_transfer = true;
+							}
 
 							break;
 						}

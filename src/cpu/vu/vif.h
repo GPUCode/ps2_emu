@@ -1,7 +1,7 @@
 #pragma once
 #include <common/component.h>
-#include <queue>
 #include <utils/queue.h>
+#include <array>
 
 namespace common
 {
@@ -176,7 +176,7 @@ namespace vu
 		/* These only on exist on VIF1 */
 		uint32_t base = 0, ofst = 0;
 		uint32_t tops = 0, itop = 0, top = 0;
-		uint32_t rn[4] = {}, cn[4] = {};
+		std::array<uint32_t, 4> rn = {}, cn = {};
 
 		/* VIF FIFO */
 		util::Queue<uint32_t, 64> fifo;

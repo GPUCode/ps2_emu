@@ -29,56 +29,104 @@ namespace gs
 	
 	uint32_t GIF::read(uint32_t addr)
 	{
-		assert(addr <= 0x100030A0);
+		uint32_t data;
+		auto offset = (addr & 0xf0) >> 4;
+		switch (offset)
+		{
+		case 2:
+			/* TODO: repoth PATH status */
+			status.fifo_count = fifo.size<uint128_t>();
+			data = status.value;
+			break;
+		default:
+			fmt::print("[GIF] Read from unknown register {}\n", REGS[offset]);
+			std::abort();
+		}
 
-		uint32_t offset = (addr & 0xf0) >> 4;
-		auto ptr = (uint32_t*)&regs + offset;
-
-		fmt::print("[GIF] Read {:#x} from {}\n", *ptr, REGS[offset]);
-
-		return *ptr;
+		return data;
 	}
 	
 	void GIF::write(uint32_t addr, uint32_t data)
 	{
-		assert(addr <= 0x100030A0);
+		auto offset = (addr & 0xf0) >> 4;
+		switch (offset)
+		{
+		case 0:
+			control.value = data;
+			
+			/* Reset the GIF when the RST bit is set */
+			if (control.reset)
+				reset();
+			
+			break;
+		default:
+			fmt::print("[GIF] Write to unknown register {}\n", REGS[offset]);
+			std::abort();
+		}
 
-		uint32_t offset = (addr & 0xf0) >> 4;
-		auto ptr = (uint32_t*)&regs + offset;
+		fmt::print("[GIF] Writing {:#x} to {}\n", data, REGS[offset]);
+	}
 
-		fmt::print("[GIF] Write {:#x} to {}\n", data, REGS[offset]);
+	void GIF::tick(uint32_t cycles)
+	{
+		while (!fifo.empty() && cycles--)
+		{
+			if (!data_count)
+				process_tag();
+			else
+				execute_command();
+		}
+	}
 
-		*ptr = data;
+	void GIF::reset()
+	{
+		/* Reset all class members */
+		control = {};
+		mode = 0;
+		status = {};
+		fifo = {};
+		tag = {};
+		data_count = reg_count = 0;
+		interal_Q = 0;
 	}
 	
-	void GIF::write_path3(uint32_t addr, uint128_t qword)
+	bool GIF::write_path3(uint32_t, uint128_t qword)
 	{
-		assert(addr == 0x10006000);
-
-		if (!data_count) /* Initiallize tag */
+		return fifo.push<uint128_t>(qword);
+	}
+	
+	void GIF::process_tag()
+	{
+		if (fifo.read(&tag.value))
 		{
-			auto& gs_regs = emulator->gs->regs;
-			tag.value = qword;
 			data_count = tag.nloop;
 			reg_count = tag.nreg;
 
+			auto& gs_regs = emulator->gs->regs;
 			fmt::print("[GIF] Received new GS primitive!\n");
 
-			/* Set the GS PRIM register to the PRIM field of GIFTag.
+			/* Set the GS PRIM register to the PRIM field of GIFTag
 			   NOTE: This only happens when PRE == 1 */
-			if (tag.pre)
-				gs_regs.prim = tag.prim;
+			gs_regs.prim = tag.pre ? tag.prim : gs_regs.prim;
 
 			/* The initial value of Q is 1.0f and is set
 			   when the GIFTag is read */
 			gs_regs.rgbaq.q = 1.0f;
+
+			/* Remove tag from fifo */
+			fifo.pop<uint128_t>();
 		}
-		else
+	}
+
+	void GIF::execute_command()
+	{
+		uint128_t qword;
+		if (fifo.read(&qword))
 		{
 			uint16_t format = tag.flg;
 			switch (format)
 			{
-			case Format::PACKED:
+			case Format::Packed:
 			{
 				process_packed(qword);
 				if (!reg_count)
@@ -88,12 +136,10 @@ namespace gs
 				}
 				break;
 			}
-			case Format::IMAGE:
+			case Format::Image:
 			{
-				uint64_t lower = qword;
-				uint64_t upper = qword >> 64;
-				emulator->gs->write_hwreg(lower);
-				emulator->gs->write_hwreg(upper);
+				emulator->gs->write_hwreg(qword);
+				emulator->gs->write_hwreg(qword >> 64);
 				data_count--;
 				break;
 			}
@@ -101,9 +147,11 @@ namespace gs
 				fmt::print("[GIF] Unknown format {:d}\n", format);
 				std::abort();
 			}
+
+			fifo.pop<uint128_t>();
 		}
 	}
-	
+
 	void GIF::process_packed(uint128_t qword)
 	{
 		int curr_reg = tag.nreg - reg_count;

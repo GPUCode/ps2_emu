@@ -193,6 +193,7 @@ namespace common
             dmac->tick(cycles);
             vif[0]->tick(cycles);
             vif[1]->tick(cycles);
+            gif->tick(cycles);
 
             /* Tick IOP components */
             cycles /= 4;

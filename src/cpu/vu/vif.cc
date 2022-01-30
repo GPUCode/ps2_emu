@@ -48,7 +48,13 @@ namespace vu
 	void VIF::reset()
 	{
 		/* Reset all the VIF registers */
-		*this = VIF(emulator, id);
+		status = {}; fbrst = {}; cycle = {};
+		err = mark = mode = num = 0;
+		mask = code = itops = 0;
+		base = ofst = tops = itop = top = 0;
+		rn = {}; cn = {}; fifo = {}; command = {};
+		subpacket_count = address = qwords_written = word_cycles = 0;
+		write_mode = WriteMode::Skipping;
 	}
 
 	uint32_t VIF::read(uint32_t address)
@@ -81,6 +87,11 @@ namespace vu
 			break;
 		case 1:
 			fbrst.value = data;
+			
+			/* Reset VIF is RST bit is set */
+			if (fbrst.reset)
+				reset();
+			
 			break;
 		case 2:
 			err = data;

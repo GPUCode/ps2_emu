@@ -1,5 +1,6 @@
 #pragma once
 #include <common/component.h>
+#include <utils/queue.h>
 
 namespace common
 {
@@ -8,40 +9,37 @@ namespace common
 
 namespace gs
 {
+	union GIFCTRL
+	{
+		uint32_t value;
+		struct
+		{
+			uint32_t reset : 1;
+			uint32_t : 2;
+			uint32_t stop : 1;
+		};
+	};
+
 	union GIFSTAT
 	{
 		uint32_t value;
 		struct
 		{
-			uint32_t M3R : 1;
-			uint32_t M3P : 1;
-			uint32_t IMT : 1;
-			uint32_t PSE : 1;
-			uint32_t IP3 : 1;
-			uint32_t P3Q : 1;
-			uint32_t P2Q : 1;
-			uint32_t P1Q : 1;
-			uint32_t OPH : 1;
-			uint32_t APATH : 2;
-			uint32_t DIR : 1;
+			uint32_t path3_mask : 1;
+			uint32_t path3_vif_mask : 1;
+			uint32_t path3_imt : 1;
+			uint32_t stop : 1;
+			uint32_t : 1;
+			uint32_t path3_interrupted : 1;
+			uint32_t path3_queued : 1;
+			uint32_t path2_queued : 1;
+			uint32_t path1_queued : 1;
+			uint32_t output_path : 1;
+			uint32_t active_path : 2;
+			uint32_t direction : 1;
 			uint32_t : 12;
-			uint32_t FQC : 5;
-			uint32_t : 3;
+			uint32_t fifo_count : 5;
 		};
-	};
-
-	struct GIFRegs
-	{
-		uint32_t GIF_CTRL;
-		uint32_t GIF_MODE;
-		GIFSTAT GIF_STAT;
-		uint32_t GIF_TAG0;
-		uint32_t GIF_TAG1;
-		uint32_t GIF_TAG2;
-		uint32_t GIF_TAG3;
-		uint32_t GIF_CNT;
-		uint32_t GIF_P3CNT;
-		uint32_t GIF_P3TAG;
 	};
 
 	/* The header of each GS Primitive */
@@ -82,31 +80,43 @@ namespace gs
 
 	enum Format : uint32_t
 	{
-		PACKED = 0,
-		REGLIST = 1,
-		IMAGE = 2,
+		Packed = 0,
+		Reglist = 1,
+		Image = 2,
 		Disable = 3
 	};
 
 	struct GIF : public common::Component
 	{
 		GIF(common::Emulator* parent);
-		
+		~GIF() = default;
+
+		void tick(uint32_t cycles);
+		void reset();
+
 		uint32_t read(uint32_t addr);
 		void write(uint32_t addr, uint32_t data);
 
 		/* Writes from various PATHs */
-		void write_path3(uint32_t addr, uint128_t data);
+		bool write_path3(uint32_t, uint128_t data);
 
 	private:
+		void process_tag();
+		void execute_command();
+
 		void process_packed(uint128_t qword);
 
 	private:
 		common::Emulator* emulator;
-		GIFRegs regs = {};
 		
+		/* GIF registers */
+		GIFCTRL control = {};
+		uint32_t mode = 0;
+		GIFSTAT status = {};
+		util::Queue<uint32_t, 64> fifo;
+
 		/* Used during transfers */
-		GIFTag tag;
+		GIFTag tag = {};
 		int data_count = 0, reg_count = 0;
 
 		/* Stores the last Q value provided by ST */
