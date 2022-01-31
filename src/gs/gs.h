@@ -1,6 +1,8 @@
 #pragma once
 #include <common/component.h>
 #include <gs/gsvram.h>
+#include <gs/gsrenderer.h>
+#include <utils/queue.h>
 
 namespace common
 {
@@ -75,9 +77,20 @@ namespace gs
 		uint64_t value;
 		struct
 		{
-			uint64_t x : 16;
-			uint64_t y : 16;
-			uint64_t z : 32;
+			uint16_t x;
+			uint16_t y;
+			uint32_t z;
+		};
+	};
+
+	union XYOFFSET
+	{
+		uint64_t value;
+		struct
+		{
+			uint16_t x_offset;
+			uint16_t : 16;
+			uint16_t y_offset;
 		};
 	};
 
@@ -127,40 +140,18 @@ namespace gs
 		};
 	};
 
-	struct GSRegs
-	{
-		uint64_t prim;
-		RGBAQReg rgbaq;
-		uint64_t st, uv;
-		XYZ xyz2, xyz3;
-		uint64_t tex0[2], tex1[2], tex2[2];
-		uint64_t clamp[2];
-		uint64_t fog, fogcol;
-		uint64_t xyoffset[2];
-		uint64_t prmodecont, prmode;
-		uint64_t texclut;
-		uint64_t scanmsk;
-		uint64_t miptbp1[2], miptbp2[2];
-		uint64_t texa, texflush;
-		uint64_t scissor[2];
-		uint64_t alpha[2];
-		uint64_t dimx, dthe;
-		uint64_t colclamp;
-		uint64_t test[2];
-		uint64_t pabe, fba[2];
-		uint64_t frame[2], zbuf[2];
-		BITBLTBUF bitbltbuf;
-		TRXPOS trxpos;
-		TRXREG trxreg;
-		uint64_t trxdir;
-	};
-
 	enum TRXDir : uint8_t
 	{
 		HostLocal = 0,
 		LocalHost = 1,
 		LocalLocal = 2,
 		None = 3
+	};
+
+	struct Vertex
+	{
+		XYZ coords;
+		RGBAQReg color;
 	};
 
 	struct GraphicsSynthesizer : public common::Component
@@ -181,13 +172,46 @@ namespace gs
 		void write_hwreg(uint64_t data);
 
 	private:
+		/* Registers the new vertex. If there are enough vertices,
+		a primitive is drawn based on the PRIM setting */
+		void submit_vertex();
+
+	private:
 		common::Emulator* emulator;
 		GSPRegs priv_regs = {};
-		GSRegs regs = {};
+		
+		/* GS internal registers */
+		uint64_t prim = 0;
+		RGBAQReg rgbaq = {};
+		uint64_t st = 0, uv = 0;
+		XYZ xyz2 = {}, xyz3 = {};
+		uint64_t tex0[2] = {}, tex1[2] = {}, tex2[2] = {};
+		uint64_t clamp[2] = {}, fog = 0, fogcol = 0;
+		XYOFFSET xyoffset[2] = {};
+		uint64_t prmodecont = 0, prmode = 0;
+		uint64_t texclut = 0, scanmsk = 0;
+		uint64_t miptbp1[2] = {}, miptbp2[2] = {};
+		uint64_t texa = 0, texflush = 0;
+		uint64_t scissor[2] = {}, alpha[2] = {};
+		uint64_t dimx = 0, dthe = 0, colclamp = 0;
+		uint64_t test[2] = {};
+		uint64_t pabe = 0, fba[2];
+		uint64_t frame[2] = {}, zbuf[2] = {};
+		BITBLTBUF bitbltbuf = {};
+		TRXPOS trxpos = {};
+		TRXREG trxreg = {};
+		uint64_t trxdir = 0;
 
+		/* Vertex queue */
+		util::Queue<Vertex, 3> vqueue = {};
+		
 		/* GS VRAM is divided into 8K pages */
 		Page* vram = nullptr;
 		/* Used to track how many pixels where written during a transfer */
 		int data_written = 0;
+
+	public:
+		/* Used the render with various GPU accelerated backends */
+		GSRenderer renderer;
 	};
 }

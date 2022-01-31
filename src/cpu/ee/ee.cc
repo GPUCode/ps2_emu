@@ -11,7 +11,7 @@ constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasi
 #define log(...) if (print_pc) fmt::print(disassembly, __VA_ARGS__)
 #endif
 
-constexpr const char* TEST_ELF = "tests/dma/vif/basic.elf";
+constexpr const char* TEST_ELF = "3stars.elf";
 bool load_elf = true;
 
 namespace ee

@@ -214,5 +214,7 @@ namespace common
         iop->intr.trigger(iop::Interrupt::VBLANKEnd);
         ee->intc.trigger(ee::Interrupt::INT_VB_OFF);
         vblank_started = false;
+
+        gs->renderer.render();
     }
 }

@@ -102,16 +102,16 @@ namespace gs
 			data_count = tag.nloop;
 			reg_count = tag.nreg;
 
-			auto& gs_regs = emulator->gs->regs;
+			auto& gs = emulator->gs;
 			fmt::print("[GIF] Received new GS primitive!\n");
 
 			/* Set the GS PRIM register to the PRIM field of GIFTag
 			   NOTE: This only happens when PRE == 1 */
-			gs_regs.prim = tag.pre ? tag.prim : gs_regs.prim;
+			gs->prim = tag.pre ? tag.prim : gs->prim;
 
 			/* The initial value of Q is 1.0f and is set
 			   when the GIFTag is read */
-			gs_regs.rgbaq.q = 1.0f;
+			gs->rgbaq.q = 1.0f;
 
 			/* Remove tag from fifo */
 			fifo.pop<uint128_t>();
@@ -159,24 +159,24 @@ namespace gs
 		uint32_t desc = (regs >> 4 * curr_reg) & 0xf;
 
 		/* Process the qword based on the descriptor */
-		auto& gs_regs = emulator->gs->regs;
+		auto& gs = emulator->gs;
 		switch (desc)
 		{
 		case REGDesc::PRIM:
 		{
-			gs_regs.prim = qword & 0x7ff;
+			gs->prim = qword & 0x7ff;
 			break;
 		}
 		case REGDesc::ST:
 		{
-			gs_regs.st = qword;
+			gs->st = qword;
 			interal_Q = qword >> 64;
 			break;
 		}
 		case REGDesc::XYZ2:
 		{
 			bool db = (qword >> 64) & (1ULL << 48);
-			auto& xyz = (db ? gs_regs.xyz3 : gs_regs.xyz2);
+			auto& xyz = (db ? gs->xyz3 : gs->xyz2);
 			xyz.x = qword & 0xffff;
 			xyz.y = (qword >> 32) & 0xffff;
 			xyz.z = ((qword >> 64) >> 37) & 0xffffffff;

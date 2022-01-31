@@ -1,6 +1,8 @@
 #include <gs/gs.h>
 #include <common/emulator.h>
+#include <gs/gsrenderer.h>
 #include <cassert>
+#include <unordered_map>
 
 static const char* PRIV_REGS[] =
 {
@@ -11,6 +13,51 @@ static const char* PRIV_REGS[] =
 	"EXTDATA", "EXTWRITE", "BGCOLOR",
 	"GS_CSR", "GS_IMR", "BUSDIR",
 	"SIGLBLID"
+};
+
+std::unordered_map<int, const char*> REGS =
+{
+	{ 0x00, "PRIM" },
+	{ 0x01, "RGBAQ" },
+	{ 0x02, "ST" },
+	{ 0x03, "UV" },
+	{ 0x04, "XYZF2" },
+	{ 0x05, "XYZ2" },
+	{ 0x06, "TEX0_1" }, { 0x07, "TEX0_2" },
+	{ 0x08, "CLAMP_1" }, { 0x9, "CLAMP_2" },
+	{ 0x0a, "FOG" },
+	{ 0x0c, "XYZF3" },
+	{ 0x0d, "XYZ3" },
+	{ 0x14, "TEX1_1" }, { 0x15, "TEX_2" },
+	{ 0x16, "TEX2_1" }, { 0x17, "TEX2_2"},
+	{ 0x18, "XYOFFSET_1" }, { 0x19, "XYOFFSET_2"},
+	{ 0x1A, "PRMODECONT" },
+	{ 0x1B, "PRMODE" },
+	{ 0x1C, "TEXCLUT" },
+	{ 0x22, "SCANMSK" },
+	{ 0x34, "MIPTBP1_1" }, { 0x35, "MIPTBP1_2" },
+	{ 0x36, "MIPTBP2_1" }, { 0x37, "MIPTBP2_2" },
+	{ 0x3B, "TEXA" },
+	{ 0x3D, "FOGCOL" },
+	{ 0x3F, "TEXFLUSH" },
+	{ 0x40, "SCISSOR_1" }, { 0x41, "SCISSOR_2" },
+	{ 0x42, "ALPHA_1"}, { 0x43, "ALPHA_2" },
+	{ 0x44, "DIMX" },
+	{ 0x45, "DTHE" },
+	{ 0x46, "COLCLAMP" },
+	{ 0x47, "TEST_1" }, { 0x48, "TEST_2" },
+	{ 0x49, "PABE" },
+	{ 0x4A, "FBA_1" }, { 0x4b, "FBA_2" },
+	{ 0x4C, "FRAME_1"}, { 0x4d, "FRAME_2" },
+	{ 0x4E, "ZBUF_1" }, { 0x4f, "ZBUF_2" },
+	{ 0x50, "BITBLTBUF" },
+	{ 0x51, "TRXPOS" },
+	{ 0x52, "TRXREG" },
+	{ 0x53, "TRXDIR" },
+	{ 0x54, "HWREG" },
+	{ 0x60, "SIGNAL" },
+	{ 0x61, "FINISH" },
+	{ 0x62, "LABEL" }
 };
 
 namespace gs
@@ -40,7 +87,7 @@ namespace gs
 		uint32_t offset = ((addr >> 4) & 0xf) + 15 * group;
 		auto ptr = (uint64_t*)&priv_regs + offset;
 
-		fmt::print("[GS] Reading {:#x} from {}\n", *ptr, PRIV_REGS[offset]);
+		//fmt::print("[GS] Reading {:#x} from {}\n", *ptr, PRIV_REGS[offset]);
 		/* Only CSR and SIGLBLID are readable! */
 		assert(offset == 15 || offset == 18);
 
@@ -62,141 +109,146 @@ namespace gs
 	{
 		switch (addr)
 		{
+		case 0x0:
+			prim = data;
+			break;
 		case 0x1:
-			regs.rgbaq.value = data;
+			rgbaq.value = data;
 			break;
 		case 0x2:
-			regs.st = data;
+			st = data;
 			break;
 		case 0x3:
-			regs.uv = data;
+			uv = data;
+			break;
+		case 0x5:
+			xyz2.value = data;
+			submit_vertex();
 			break;
 		case 0x6:
 		case 0x7:
-			regs.tex0[addr & 1] = data;
+			tex0[addr & 1] = data;
 			break;
 		case 0x8:
 		case 0x9:
-			regs.clamp[addr & 1] = data;
+			clamp[addr & 1] = data;
 			break;
 		case 0xa:
-			regs.fog = data;
+			fog = data;
 			break;
 		case 0x14:
 		case 0x15:
-			regs.tex1[addr & 1] = data;
+			tex1[addr & 1] = data;
 			break;
 		case 0x16:
 		case 0x17:
-			regs.tex2[addr & 1] = data;
+			tex2[addr & 1] = data;
 			break;
 		case 0x18:
 		case 0x19:
-			regs.xyoffset[addr & 1] = data;
+			xyoffset[addr & 1].value = data;
 			break;
 		case 0x1a:
-			regs.prmodecont = data;
+			prmodecont = data;
 			break;
 		case 0x1b:
-			regs.prmode = data;
+			prmode = data;
 			break;
 		case 0x1c:
-			regs.texclut = data;
+			texclut = data;
 			break;
 		case 0x22:
-			regs.scanmsk = data;
+			scanmsk = data;
 			break;
 		case 0x34:
 		case 0x35:
-			regs.miptbp1[addr & 1] = data;
+			miptbp1[addr & 1] = data;
 			break;
 		case 0x36:
 		case 0x37:
-			regs.miptbp2[addr & 1] = data;
+			miptbp2[addr & 1] = data;
 			break;
 		case 0x3b:
-			regs.texa = data;
+			texa = data;
 			break;
 		case 0x3d:
-			regs.fogcol = data;
+			fogcol = data;
 			break;
 		case 0x3f:
-			regs.texflush = data;
+			texflush = data;
 			break;
 		case 0x40:
 		case 0x41:
-			regs.scissor[addr & 1] = data;
+			scissor[addr & 1] = data;
 			break;
 		case 0x42:
 		case 0x43:
-			regs.alpha[addr & 1] = data;
+			alpha[addr & 1] = data;
 			break;
 		case 0x44:
-			regs.dimx = data;
+			dimx = data;
 			break;
 		case 0x45:
-			regs.dthe = data;
+			dthe = data;
 			break;
 		case 0x46:
-			regs.colclamp = data;
+			colclamp = data;
 			break;
 		case 0x47:
 		case 0x48:
-			regs.test[addr & 1] = data;
+			test[addr & 1] = data;
 			break;
 		case 0x49:
-			regs.pabe = data;
+			pabe = data;
 			break;
 		case 0x4a:
 		case 0x4b:
-			regs.fba[addr & 1] = data;
+			fba[addr & 1] = data;
 			break;
 		case 0x4c:
 		case 0x4d:
-			regs.frame[addr & 1] = data;
+			frame[addr & 1] = data;
 			break;
 		case 0x4e:
 		case 0x4f:
-			regs.zbuf[addr & 1] = data;
+			zbuf[addr & 1] = data;
 			break;
 		case 0x50:
-			regs.bitbltbuf.value = data;
+			bitbltbuf.value = data;
 			break;
 		case 0x51:
-			regs.trxpos.value = data;
+			trxpos.value = data;
 			break;
 		case 0x52:
-			regs.trxreg.value = data;
+			trxreg.value = data;
 			break;
 		case 0x53:
-			regs.trxdir = data;
+			trxdir = data;
 			data_written = 0;
 			break;
 		default:
 			fmt::print("[GS] Writting {:#x} to unknown address {:#x}\n", data, addr);
 			std::abort();
 		}
+
+		fmt::print("[GS] Writing {:#x} to {}\n", data, REGS[addr]);
 	}
 
 	void GraphicsSynthesizer::write_hwreg(uint64_t data)
 	{
 		/* HWREG is only used for GIF -> VRAM transfers */
-		if (regs.trxdir != TRXDir::HostLocal)
+		if (trxdir != TRXDir::HostLocal)
 		{
 			fmt::print("[GS] Write to HWREG with invalid transfer dir!\n");
 			std::abort();
 			return;
 		}
-
-		auto& bitbltbuf = regs.bitbltbuf;
-		auto& trxpos = regs.trxpos;
-		auto& trxreg = regs.trxreg;
 		
 		/* Useful for many things */
 		uint32_t width_in_pages = bitbltbuf.dest_width;
 		uint32_t width_in_pixels = trxreg.width;
 
-		uint16_t format = regs.bitbltbuf.dest_pixel_format;
+		uint16_t format = bitbltbuf.dest_pixel_format;
 		switch (format)
 		{
 		case PixelFormat::PSMCT32:
@@ -252,7 +304,50 @@ namespace gs
 			data_written = 0;
 
 			/* Deactivate TRXDIR */
-			regs.trxdir = TRXDir::None;
+			trxdir = TRXDir::None;
 		}
+	}
+	
+	void GraphicsSynthesizer::submit_vertex()
+	{
+		Vertex v;
+		v.coords = xyz2;
+		v.color = rgbaq;
+
+		if (vqueue.push(v))
+		{
+			if (vqueue.size() == 2)
+			{
+				switch (prim & 0x7)
+				{
+				case Primitive::Sprite:
+				{
+					Vertex v1, v2;
+					vqueue.read(&v1); vqueue.pop<Vertex>();
+					vqueue.read(&v2); vqueue.pop<Vertex>();
+
+					v1.coords.x >>= 4; v1.coords.y >>= 4;
+					v2.coords.x >>= 4; v2.coords.y >>= 4;
+
+					Vert p1, p2;
+					p1.x = (v1.coords.x - (xyoffset[0].x_offset >> 4));
+					p1.y = (v1.coords.y - (xyoffset[0].y_offset >> 4));
+
+					p2.x = (v2.coords.x - (xyoffset[0].x_offset >> 4));
+					p2.y = (v2.coords.y - (xyoffset[0].y_offset >> 4));
+
+					renderer.submit_sprite(p1, p2);
+					break;
+				}
+				default:
+					std::abort();
+				}
+			}
+
+			return;
+		}
+
+		fmt::print("[GS] Vertex queue full!\n");
+		std::abort();
 	}
 }
