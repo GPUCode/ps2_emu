@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <vector>
 
 namespace gs
 {
@@ -14,9 +15,10 @@ namespace gs
 		Sprite = 6
 	};
 
-	struct Vert
+	struct GSVertex
 	{
-		int x, y, z;
+		float x, y, z = 0;
+		float r = 0.0f, g = 0.0f, b = 0.0f;
 	};
 
 	/* The main renderer responsible for drawing the fancy
@@ -26,9 +28,12 @@ namespace gs
 		GSRenderer();
 
 		void render();
-		void submit_sprite(Vert v1, Vert v2);
+
+		void submit_vertex(GSVertex v1);
+		void submit_sprite(GSVertex v1, GSVertex v2);
 
 	private:
 		uint32_t vbo, vao;
+		std::vector<GSVertex> draw_data;
 	};
 }

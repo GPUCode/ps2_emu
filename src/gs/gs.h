@@ -3,6 +3,7 @@
 #include <gs/gsvram.h>
 #include <gs/gsrenderer.h>
 #include <utils/queue.h>
+#include <fstream>
 
 namespace common
 {
@@ -77,9 +78,21 @@ namespace gs
 		uint64_t value;
 		struct
 		{
-			uint16_t x;
-			uint16_t y;
-			uint32_t z;
+			uint64_t x : 16;
+			uint64_t y : 16;
+			uint64_t z : 32;
+		};
+	};
+
+	union XYZF
+	{
+		uint64_t value;
+		struct
+		{
+			uint64_t x : 16;
+			uint64_t y : 16;
+			uint64_t z : 24;
+			uint64_t f : 8;
 		};
 	};
 
@@ -148,12 +161,6 @@ namespace gs
 		None = 3
 	};
 
-	struct Vertex
-	{
-		XYZ coords;
-		RGBAQReg color;
-	};
-
 	struct GraphicsSynthesizer : public common::Component
 	{
 		friend struct GIF;
@@ -174,9 +181,9 @@ namespace gs
 	private:
 		/* Registers the new vertex. If there are enough vertices,
 		a primitive is drawn based on the PRIM setting */
-		void submit_vertex();
+		void submit_vertex(bool fog);
 
-	private:
+	public:
 		common::Emulator* emulator;
 		GSPRegs priv_regs = {};
 		
@@ -185,6 +192,7 @@ namespace gs
 		RGBAQReg rgbaq = {};
 		uint64_t st = 0, uv = 0;
 		XYZ xyz2 = {}, xyz3 = {};
+		XYZF xyzf2 = {}, xyzf3 = {};
 		uint64_t tex0[2] = {}, tex1[2] = {}, tex2[2] = {};
 		uint64_t clamp[2] = {}, fog = 0, fogcol = 0;
 		XYOFFSET xyoffset[2] = {};
@@ -203,14 +211,13 @@ namespace gs
 		uint64_t trxdir = 0;
 
 		/* Vertex queue */
-		util::Queue<Vertex, 3> vqueue = {};
+		util::Queue<GSVertex, 3> vqueue = {};
 		
 		/* GS VRAM is divided into 8K pages */
 		Page* vram = nullptr;
 		/* Used to track how many pixels where written during a transfer */
 		int data_written = 0;
 
-	public:
 		/* Used the render with various GPU accelerated backends */
 		GSRenderer renderer;
 	};

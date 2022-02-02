@@ -133,7 +133,7 @@ namespace ee
         void op_mthi(); void op_mtlo(); void op_mtsa(); void op_lwc1();
         void op_dsubu(); void op_blezl(); void op_xor(); void op_multu();
         void op_lwl(); void op_lwr(); void op_swl(); void op_swr();
-        void op_sqc2(); void op_dsra();
+        void op_sqc2(); void op_dsra(); void op_sub(); void op_add();
 
         /* COP0 instructions */
         void op_di(); void op_eret(); void op_ei();

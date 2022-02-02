@@ -213,8 +213,7 @@ namespace ee
 								channel.address += 16;
 								channel.qword_count--;
 
-								assert(!channel.control.mode);
-								if (!channel.qword_count)
+								if (!channel.qword_count && !channel.control.mode)
 									channel.end_transfer = true;
 							}
 
@@ -305,6 +304,43 @@ namespace ee
 		auto& channel = channels[id];
 		switch (id)
 		{
+		case DMAChannels::GIF:
+		{
+			assert(!channel.tag_address.mem_select);
+
+			auto& gif = emulator->gif;
+			auto address = channel.tag_address.address;
+
+			tag.value = *(uint128_t*)&emulator->ee->ram[address];
+			fmt::print("[DMAC] Read GIF DMA tag {:#x}\n", (uint64_t)tag.value);
+
+			/* Update channel from tag */
+			channel.qword_count = tag.qwords;
+			channel.control.tag = (tag.value >> 16) & 0xffff;
+
+			uint16_t tag_id = tag.id;
+			switch (tag_id)
+			{
+			case DMASourceID::REFE:
+				channel.address = tag.address;
+				channel.tag_address.value += 16;
+				channel.end_transfer = true;
+				break;
+			case DMASourceID::CNT:
+				channel.address = channel.tag_address.address + 16;
+				channel.tag_address.value = channel.address + channel.qword_count * 16;
+				break;
+			default:
+				fmt::print("\n[DMAC] Unrecognized GIF DMAtag id {:d}\n", tag_id);
+				std::abort();
+			}
+
+			/* Just end transfer, since an interrupt will be raised there anyways  */
+			if (channel.control.enable_irq_bit && tag.irq)
+				channel.end_transfer = true;
+
+			break;
+		}
 		case DMAChannels::VIF0:
 		case DMAChannels::VIF1:
 		{

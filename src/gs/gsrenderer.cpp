@@ -4,23 +4,26 @@
 
 const char* vertexShaderSource = R"(
 #version 330 core
-layout (location = 0) in ivec3 aPos;
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aColor;
+
+out vec3 ourColor; // output a color to the fragment shader
 
 void main()
 {
-    float pos_x = (aPos.x / 320.0f) - 1.0f;
-    float pos_y = 1.0f - (aPos.y / 112.0f);
-    gl_Position = vec4(pos_y, pos_x, aPos.z, 1.0);
+    gl_Position = vec4(aPos, 1.0);
+    ourColor = aColor; // set ourColor to the input color we got from the vertex data
 }
 )";
 
 const char* fragmentShaderSource = R"(
 #version 330 core
 out vec4 FragColor;
+in vec3 ourColor;
 
 void main()
 {
-   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
+   FragColor = vec4(ourColor, 1.0);
 }
 )";
 
@@ -41,6 +44,7 @@ namespace gs
         {
             glGetShaderInfoLog(vertex, 512, NULL, infoLog);
             fmt::print("[GS][OpenGL] Vertex shader compilation failed\n");
+            std::abort();
         }
 
         uint32_t fragment = glCreateShader(GL_FRAGMENT_SHADER);
@@ -51,6 +55,7 @@ namespace gs
         {
             glGetShaderInfoLog(fragment, 512, NULL, infoLog);
             fmt::print("[GS][OpenGL] Fragment shader compilation failed\n");
+            std::abort();
         }
         
         /* Link shaders */
@@ -63,6 +68,7 @@ namespace gs
         {
             glGetProgramInfoLog(program, 512, NULL, infoLog);
             fmt::print("[GS][OpenGL] Shader linking failed\n");
+            std::abort();
         }
 
         /* Delete unused objects */
@@ -76,29 +82,42 @@ namespace gs
         
         glBindVertexArray(vao);
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+        glBufferData(GL_ARRAY_BUFFER, sizeof(GSVertex) * 1024 * 512, nullptr, GL_DYNAMIC_DRAW);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(GSVertex), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(GSVertex), (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+
+        /* Enable depth testing */
+        glEnable(GL_DEPTH_TEST);
 	}
     
     void GSRenderer::render()
     {
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        /* Add data to the VBO */
+        glBufferSubData(GL_ARRAY_BUFFER, 0, draw_data.size() * sizeof(GSVertex), draw_data.data());
+
+        /* Draw vertices */
+        glDrawArrays(GL_TRIANGLES, 0, draw_data.size());
+        
+        draw_data.clear();
     }
     
-    void GSRenderer::submit_sprite(Vert v1, Vert v2)
+    void GSRenderer::submit_vertex(GSVertex v1)
     {
-        int vertices[] = 
-        {
-            v2.x, v1.y, 0,
-            v2.x, v2.y, 0,
-            v1.x, v1.y, 0,
-            v2.x, v2.y, 0,
-            v1.x, v2.y, 0,
-            v1.x, v1.y, 0
-        };
+        draw_data.push_back(v1);
+    }
 
-        /* Add data to the VBO */
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
-
-        glVertexAttribIPointer(0, 3, GL_INT, 3 * sizeof(int), (void*)0);
-        glEnableVertexAttribArray(0);
+    void GSRenderer::submit_sprite(GSVertex v1, GSVertex v2)
+    {
+        draw_data.push_back({ .x = v2.x, .y = v1.y });
+        draw_data.push_back({ .x = v2.x, .y = v2.y });
+        draw_data.push_back({ .x = v1.x, .y = v1.y });
+        draw_data.push_back({ .x = v2.x, .y = v2.y });
+        draw_data.push_back({ .x = v1.x, .y = v2.y });
+        draw_data.push_back({ .x = v1.x, .y = v1.y });
     }
 }

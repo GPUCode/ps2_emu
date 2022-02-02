@@ -67,13 +67,7 @@ namespace gs
 		UV = 3,
 		XYZF2 = 4, 
 		XYZ2 = 5,
-		TEX0_1 = 6,
-		TEX0_2 = 7,
-		CLAMP_1 = 8,
-		CLAMP_2 = 9,
 		FOG = 10,
-		XYZF3 = 12,
-		XYZ3 = 13,
 		A_D = 14,
 		NOP = 15
 	};

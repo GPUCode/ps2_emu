@@ -205,6 +205,8 @@ namespace common
             if (!vblank_started && total_cycles >= CYCLES_VBLANK_OFF)
             {
                 vblank_started = true;
+                gs->priv_regs.csr.vsint = true;
+                gs->renderer.render();
                 ee->intc.trigger(ee::Interrupt::INT_VB_ON);
                 iop->intr.trigger(iop::Interrupt::VBLANKBegin);
             }
@@ -214,7 +216,6 @@ namespace common
         iop->intr.trigger(iop::Interrupt::VBLANKEnd);
         ee->intc.trigger(ee::Interrupt::INT_VB_OFF);
         vblank_started = false;
-
-        gs->renderer.render();
+        gs->priv_regs.csr.vsint = false;
     }
 }

@@ -30,7 +30,7 @@ namespace util
 			return false;
 		}
 
-		template <typename T>
+		template <typename T = _Ty>
 		inline bool pop()
 		{
 			static_assert(sizeof(T) >= sizeof(_Ty));

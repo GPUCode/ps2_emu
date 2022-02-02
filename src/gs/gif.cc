@@ -167,19 +167,49 @@ namespace gs
 			gs->prim = qword & 0x7ff;
 			break;
 		}
+		case REGDesc::RGBAQ:
+		{
+			gs->rgbaq.r = qword & 0xff;
+			gs->rgbaq.g = (qword >> 32) & 0xff;
+			gs->rgbaq.b = (qword >> 64) & 0xff;
+			gs->rgbaq.a = (qword >> 96) & 0xff;
+			break;
+		}
 		case REGDesc::ST:
 		{
 			gs->st = qword;
 			interal_Q = qword >> 64;
 			break;
 		}
+		case REGDesc::XYZF2:
+		{
+			bool disable_draw = (qword >> 111) & 1;
+			auto address = disable_draw ? 0xc : 0x4;
+
+			/* Form the target register */
+			XYZF target;
+			target.x = qword & 0xffff;
+			target.y = (qword >> 32) & 0xffff;
+			target.z = (qword >> 68) & 0xffffff;
+			target.f = (qword >> 100) & 0xff;
+
+			/* Let the GS handle the rest */
+			gs->write(address, target.value);
+			break;
+		}
 		case REGDesc::XYZ2:
 		{
-			bool db = (qword >> 64) & (1ULL << 48);
-			auto& xyz = (db ? gs->xyz3 : gs->xyz2);
-			xyz.x = qword & 0xffff;
-			xyz.y = (qword >> 32) & 0xffff;
-			xyz.z = ((qword >> 64) >> 37) & 0xffffffff;
+			bool disable_draw = (qword >> 111) & 1;
+			auto address = disable_draw ? 0xd : 0x5;
+			
+			/* Form the target register */
+			XYZ target;
+			target.x = qword & 0xffff;
+			target.y = (qword >> 32) & 0xffff;
+			target.z = (qword >> 64) & 0xffffffff;
+
+			/* Let the GS handle the rest */
+			gs->write(address, target.value);
 			break;
 		}
 		case REGDesc::A_D:

@@ -3,6 +3,7 @@
 #include <gs/gsrenderer.h>
 #include <cassert>
 #include <unordered_map>
+#include <glad/glad.h>
 
 static const char* PRIV_REGS[] =
 {
@@ -107,6 +108,7 @@ namespace gs
 
 	void GraphicsSynthesizer::write(uint16_t addr, uint64_t data)
 	{
+		auto context = addr & 1;
 		switch (addr)
 		{
 		case 0x0:
@@ -121,32 +123,36 @@ namespace gs
 		case 0x3:
 			uv = data;
 			break;
+		case 0x4:
+			xyzf2.value = data;
+			submit_vertex(true);
+			break;
 		case 0x5:
 			xyz2.value = data;
-			submit_vertex();
+			submit_vertex(false);
 			break;
 		case 0x6:
 		case 0x7:
-			tex0[addr & 1] = data;
+			tex0[context] = data;
 			break;
 		case 0x8:
 		case 0x9:
-			clamp[addr & 1] = data;
+			clamp[context] = data;
 			break;
 		case 0xa:
 			fog = data;
 			break;
 		case 0x14:
 		case 0x15:
-			tex1[addr & 1] = data;
+			tex1[context] = data;
 			break;
 		case 0x16:
 		case 0x17:
-			tex2[addr & 1] = data;
+			tex2[context] = data;
 			break;
 		case 0x18:
 		case 0x19:
-			xyoffset[addr & 1].value = data;
+			xyoffset[context].value = data;
 			break;
 		case 0x1a:
 			prmodecont = data;
@@ -162,11 +168,11 @@ namespace gs
 			break;
 		case 0x34:
 		case 0x35:
-			miptbp1[addr & 1] = data;
+			miptbp1[context] = data;
 			break;
 		case 0x36:
 		case 0x37:
-			miptbp2[addr & 1] = data;
+			miptbp2[context] = data;
 			break;
 		case 0x3b:
 			texa = data;
@@ -179,11 +185,11 @@ namespace gs
 			break;
 		case 0x40:
 		case 0x41:
-			scissor[addr & 1] = data;
+			scissor[context] = data;
 			break;
 		case 0x42:
 		case 0x43:
-			alpha[addr & 1] = data;
+			alpha[context] = data;
 			break;
 		case 0x44:
 			dimx = data;
@@ -196,22 +202,42 @@ namespace gs
 			break;
 		case 0x47:
 		case 0x48:
-			test[addr & 1] = data;
+			test[context] = data;
+			
+			renderer.render();
+			glClearDepth(0.0);
+			glClear(GL_DEPTH_BUFFER_BIT);
+			switch ((test[context] >> 17) & 0x3)
+			{
+			case 0:
+				glDepthFunc(GL_NEVER);
+				break;
+			case 1:
+				glDepthFunc(GL_GEQUAL);
+				break;
+			case 3:
+				glDepthFunc(GL_GREATER);
+				break;
+			default:
+				fmt::print("[GS] Unknown depth function selected!\n");
+				std::abort();
+			}
+
 			break;
 		case 0x49:
 			pabe = data;
 			break;
 		case 0x4a:
 		case 0x4b:
-			fba[addr & 1] = data;
+			fba[context] = data;
 			break;
 		case 0x4c:
 		case 0x4d:
-			frame[addr & 1] = data;
+			frame[context] = data;
 			break;
 		case 0x4e:
 		case 0x4f:
-			zbuf[addr & 1] = data;
+			zbuf[context] = data;
 			break;
 		case 0x50:
 			bitbltbuf.value = data;
@@ -308,46 +334,66 @@ namespace gs
 		}
 	}
 	
-	void GraphicsSynthesizer::submit_vertex()
+	void GraphicsSynthesizer::submit_vertex(bool fog)
 	{
-		Vertex v;
-		v.coords = xyz2;
-		v.color = rgbaq;
+		GSVertex vertex;
+		vertex.x = fog ? xyzf2.x : xyz2.x;
+		vertex.y = fog ? xyzf2.y : xyz2.y;
+		vertex.z = fog ? xyzf2.z : xyz2.z;
 
-		if (vqueue.push(v))
+		/* Convert the primitive coords to window coords */
+		vertex.x = (vertex.x - xyoffset[0].x_offset) / 16.0f;
+		vertex.y = (vertex.y - xyoffset[0].y_offset) / 16.0f;
+
+		/* Convert to OpenGL coords */
+		vertex.x = (vertex.x / 320.0f) - 1.0f;
+		vertex.y = 1.0f - (vertex.y / 112.0f);
+		vertex.z = (vertex.z / INT_MAX) * 2.0f - 1.0f;
+
+		/* Set color information */
+		vertex.r = rgbaq.r / 255.0f;
+		vertex.g = rgbaq.g / 255.0f;
+		vertex.b = rgbaq.b / 255.0f;
+
+		if (!vqueue.push(vertex))
 		{
-			if (vqueue.size() == 2)
-			{
-				switch (prim & 0x7)
-				{
-				case Primitive::Sprite:
-				{
-					Vertex v1, v2;
-					vqueue.read(&v1); vqueue.pop<Vertex>();
-					vqueue.read(&v2); vqueue.pop<Vertex>();
-
-					v1.coords.x >>= 4; v1.coords.y >>= 4;
-					v2.coords.x >>= 4; v2.coords.y >>= 4;
-
-					Vert p1, p2;
-					p1.x = (v1.coords.x - (xyoffset[0].x_offset >> 4));
-					p1.y = (v1.coords.y - (xyoffset[0].y_offset >> 4));
-
-					p2.x = (v2.coords.x - (xyoffset[0].x_offset >> 4));
-					p2.y = (v2.coords.y - (xyoffset[0].y_offset >> 4));
-
-					renderer.submit_sprite(p1, p2);
-					break;
-				}
-				default:
-					std::abort();
-				}
-			}
-
-			return;
+			fmt::print("[GS] Vertex queue full!\n");
+			std::abort();
 		}
 
-		fmt::print("[GS] Vertex queue full!\n");
-		std::abort();
+		if (vqueue.size() == 2)
+		{
+			switch (prim & 0x7)
+			{
+			case Primitive::Sprite:
+			{
+				GSVertex v1, v2;
+				vqueue.read(&v1); vqueue.pop();
+				vqueue.read(&v2); vqueue.pop();
+				//renderer.submit_sprite(v1, v2);
+				break;
+			}
+			}
+		}
+		else if (vqueue.size() == 3)
+		{
+			switch (prim & 0x7)
+			{
+			case Primitive::Triangle:
+			{
+				GSVertex v;
+				for (int i = 0; i < 3; i++)
+				{
+					vqueue.read(&v);
+					bool f = vqueue.pop();
+
+					assert(f);
+
+					renderer.submit_vertex(v);
+				}
+				break;
+			}
+			}
+		}
 	}
 }
