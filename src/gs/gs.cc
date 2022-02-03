@@ -297,6 +297,9 @@ namespace gs
 
 				fmt::print("[GS] Writing to PSMCT32 buffer at ({}, {})\n", x, y);
 
+				x += trxpos.dest_top_left_x;
+				y += trxpos.dest_top_left_y;
+
 				/* Calculate which page we are refering to */
 				/* NOTE: x, y can refer to outside of the selected page (if their values are bigger than the page dimentions) */
 				/* Update the page accordingly. Loop back if the page is over the page width */
@@ -342,7 +345,7 @@ namespace gs
 			trxdir = TRXDir::None;
 		}
 	}
-	
+
 	void GraphicsSynthesizer::submit_vertex(bool fog)
 	{
 		GSVertex vertex;
