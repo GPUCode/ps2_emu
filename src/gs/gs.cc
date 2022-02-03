@@ -104,6 +104,16 @@ namespace gs
 		fmt::print("[GS] Writing {:#x} to {}\n", data, PRIV_REGS[offset]);
 
 		*ptr = data;
+
+		switch (offset)
+		{
+		case 15:
+		{
+			if (data & 0x8)
+				priv_regs.csr.vsint = false;
+			break;
+		}
+		}
 	}
 
 	void GraphicsSynthesizer::write(uint16_t addr, uint64_t data)
@@ -204,9 +214,8 @@ namespace gs
 		case 0x48:
 			test[context] = data;
 			
+			/* Flush renderer */
 			renderer.render();
-			glClearDepth(0.0);
-			glClear(GL_DEPTH_BUFFER_BIT);
 			switch ((test[context] >> 17) & 0x3)
 			{
 			case 0:
@@ -348,7 +357,7 @@ namespace gs
 		/* Convert to OpenGL coords */
 		vertex.x = (vertex.x / 320.0f) - 1.0f;
 		vertex.y = 1.0f - (vertex.y / 112.0f);
-		vertex.z = (vertex.z / INT_MAX) * 2.0f - 1.0f;
+		vertex.z = vertex.z / INT_MAX;
 
 		/* Set color information */
 		vertex.r = rgbaq.r / 255.0f;
@@ -370,7 +379,7 @@ namespace gs
 				GSVertex v1, v2;
 				vqueue.read(&v1); vqueue.pop();
 				vqueue.read(&v2); vqueue.pop();
-				//renderer.submit_sprite(v1, v2);
+				renderer.submit_sprite(v1, v2);
 				break;
 			}
 			}

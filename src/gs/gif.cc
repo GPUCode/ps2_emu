@@ -164,20 +164,23 @@ namespace gs
 		{
 		case REGDesc::PRIM:
 		{
-			gs->prim = qword & 0x7ff;
+			gs->write(0x0, qword & 0x7ff);
 			break;
 		}
 		case REGDesc::RGBAQ:
 		{
-			gs->rgbaq.r = qword & 0xff;
-			gs->rgbaq.g = (qword >> 32) & 0xff;
-			gs->rgbaq.b = (qword >> 64) & 0xff;
-			gs->rgbaq.a = (qword >> 96) & 0xff;
+			RGBAQReg target;
+			target.r = qword & 0xff;
+			target.g = (qword >> 32) & 0xff;
+			target.b = (qword >> 64) & 0xff;
+			target.a = (qword >> 96) & 0xff;
+
+			gs->write(0x1, target.value);
 			break;
 		}
 		case REGDesc::ST:
 		{
-			gs->st = qword;
+			gs->write(0x2, qword);
 			interal_Q = qword >> 64;
 			break;
 		}

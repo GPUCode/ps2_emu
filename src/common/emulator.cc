@@ -206,7 +206,14 @@ namespace common
             {
                 vblank_started = true;
                 gs->priv_regs.csr.vsint = true;
+
                 gs->renderer.render();
+
+                gs->priv_regs.csr.field = !gs->priv_regs.csr.field;
+
+                if (!(gs->priv_regs.imr & 0x800))
+                    ee->intc.trigger(ee::Interrupt::INT_GS);
+
                 ee->intc.trigger(ee::Interrupt::INT_VB_ON);
                 iop->intr.trigger(iop::Interrupt::VBLANKBegin);
             }
