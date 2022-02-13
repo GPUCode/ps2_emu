@@ -322,6 +322,9 @@ namespace gs
 
 				fmt::print("[GS] Writing to PSMCT16 buffer at ({}, {})\n", x, y);
 
+				x += trxpos.dest_top_left_x;
+				y += trxpos.dest_top_left_y;
+
 				uint32_t page = bitbltbuf.dest_base / BLOCKS_PER_PAGE;
 				page += (x / 64) % width_in_pages + (y / 64) * width_in_pages;
 
@@ -361,7 +364,7 @@ namespace gs
 		vertex.x = (vertex.x / 320.0f) - 1.0f;
 		vertex.y = 1.0f - (vertex.y / 112.0f);
 		vertex.z = vertex.z / INT_MAX;
-
+		
 		/* Set color information */
 		vertex.r = rgbaq.r / 255.0f;
 		vertex.g = rgbaq.g / 255.0f;

@@ -1,6 +1,7 @@
 #include <cpu/ee/ee.h>
 #include <cpu/vu/vu.h>
 #include <common/emulator.h>
+#include <cpu/ee/jit/jit.h>
 #include <fmt/color.h>
 #include <unordered_map>
 
@@ -27,6 +28,9 @@ namespace ee
 
         /* Reset CPU state. */
         reset();
+
+        jit::JITCompiler compiler(this);
+        compiler.reset();
     }
 
     EmotionEngine::~EmotionEngine()
@@ -69,6 +73,13 @@ namespace ee
                 skip_branch_delay = false;
                 log("SKIPPED delay slot\n");
                 continue;
+            }
+
+            if (instr.pc == 0x80001000)
+            {
+                std::ofstream kernel_dump("ps2kernel.bin", std::ios::binary | std::ios::out);
+                kernel_dump.write((char*)ram, 1024 * 1024); /* Kernel is 1MB */
+                kernel_dump.close();
             }
 
             /* HACK. Used to load test elfs */

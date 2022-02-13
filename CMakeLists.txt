@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 # Set the project name
 set(PROJECT_NAME gcnemu)
+set(ASMJIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/asmjit")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10000000")
 
 project(${PROJECT_NAME})
@@ -33,7 +34,14 @@ add_executable(${PROJECT_NAME}
 	"src/media/sio2.cc"
 	"src/media/gamepad.cc"
 	"src/gs/gsvram.cc"
- "src/gs/gsrenderer.h" "src/gs/gsrenderer.cpp")
+	"src/gs/gsrenderer.cpp" 
+	"src/cpu/ee/jit/jit.cc"
+ "src/cpu/ee/jit/ir.h")
+
+# Asmjit
+set(ASMJIT_STATIC TRUE)
+add_subdirectory(${ASMJIT_DIR})
+target_link_libraries(${PROJECT_NAME} asmjit::asmjit)
 
 # Link to all the required conan libs
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
