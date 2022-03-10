@@ -100,8 +100,10 @@ namespace ee
 		/* NOTE: This is actually required since the BIOS writes
 		   unaligned addresses to the GIF channel for some reason
 		   and expects it to be read correctly... */
-		data = (offset == 1 ? data &= 0x01fffff0 : data);
-		*ptr = data;
+        if (offset == 1)
+            data &= 0x01fffff0;
+
+        *ptr = data;
 
 		if (channels[channel].control.running)
 		{
@@ -355,7 +357,7 @@ namespace ee
 			/* Transfer the tag before any data */
 			if (channel.control.transfer_tag)
 			{
-				if (!vif->write_fifo<uint64_t>(NULL, tag.data))
+                if (!vif->write_fifo<uint64_t>(NULL, tag.data))
 					return;
 			}
 

@@ -24,7 +24,7 @@ namespace ee
         disassembly = std::fopen("disassembly_ee.log", "w");
 
         /* Allocate the 32MB of EE memory */
-        ram = new uint8_t[32 * 1024 * 1024]{};
+        ram = new uint8_t[32 * 1024 * 1024];
 
         /* Reset CPU state. */
         reset();
@@ -72,21 +72,6 @@ namespace ee
             {
                 skip_branch_delay = false;
                 log("SKIPPED delay slot\n");
-                continue;
-            }
-
-            if (instr.pc == 0x80001000)
-            {
-                std::ofstream kernel_dump("ps2kernel.bin", std::ios::binary | std::ios::out);
-                kernel_dump.write((char*)ram, 1024 * 1024); /* Kernel is 1MB */
-                kernel_dump.close();
-            }
-
-            /* HACK. Used to load test elfs */
-            if (instr.pc < 0x80000000 && instr.pc >= 0x00100000 && load_elf)
-            {
-                emulator->load_elf(TEST_ELF);
-                load_elf = false;
                 continue;
             }
 
@@ -837,10 +822,8 @@ namespace ee
         int16_t offset = (int16_t)instr.i_type.immediate;
 
         uint32_t vaddr = offset + gpr[base].word[0];
-        uint64_t data1 = gpr[rt].dword[0];
-        uint64_t data2 = gpr[rt].dword[1];
 
-        log("SQ: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, data1, vaddr, base, gpr[base].word[0], offset);
+        log("SQ: Writing GPR[{:d}] ({:#x}) to address {:#x} = GPR[{:d}] ({:#x}) + {:d}\n", rt, gpr[rt].dword[0], vaddr, base, gpr[base].word[0], offset);
         if ((vaddr & 0xF) != 0)
         {
             log("[ERROR] SQ: Address {:#x} is not aligned\n", vaddr);
@@ -1371,6 +1354,8 @@ namespace ee
         log("DI: STATUS.EIE = {:d}\n", (uint16_t)status.eie);
     }
 
+    bool done = false;
+
     void EmotionEngine::op_eret()
     {
         log("ERET!\n");
@@ -1388,6 +1373,12 @@ namespace ee
 
         /* Skip branch delay slot */
         direct_jump();
+
+        if (!done)
+        {
+            emulator->load_elf(TEST_ELF);
+            done = true;
+        }
     }
 
     void EmotionEngine::op_ei()

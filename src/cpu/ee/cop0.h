@@ -15,7 +15,7 @@ namespace ee
     /* The status register fields */
     union COP0Status
     {
-        uint32_t value = 0x400004; /* BEV, ERL = 1 by default */
+        uint32_t value;
         struct
         {
             uint32_t ie : 1; /* Interrupt Enable */
@@ -43,7 +43,7 @@ namespace ee
 
     union COP0Cause
     {
-        uint32_t value = 0;
+        uint32_t value;
         struct
         {
             uint32_t : 2;
@@ -72,6 +72,8 @@ namespace ee
     /* The COP0 registers */
     union COP0
     {
+        COP0() { status.value = 0x400004; /* BEV, ERL = 1 by default */ }
+
         uint32_t regs[32] = {};
         struct
         {

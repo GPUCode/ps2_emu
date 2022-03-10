@@ -999,7 +999,6 @@ namespace iop
     void IOProcessor::op_mtc0()
     {
         uint16_t rt = instr.r_type.rt;
-        uint16_t rs = instr.r_type.rs;
         uint16_t rd = instr.r_type.rd;
 
         cop0.regs[rd] = gpr[rt];

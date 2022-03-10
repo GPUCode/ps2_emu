@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.10)
 
 # Set the project name
 set(PROJECT_NAME gcnemu)
+set(QT_CREATOR_SKIP_PACKAGE_MANAGER_SETUP ON)
 set(ASMJIT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/asmjit")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10000000")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fms-extensions")
 
 project(${PROJECT_NAME})
 
