@@ -135,11 +135,11 @@ namespace gs
 			break;
 		case 0x4:
 			xyzf2.value = data;
-			submit_vertex(true);
+            submit_vertex_fog(xyzf2, true);
 			break;
 		case 0x5:
 			xyz2.value = data;
-			submit_vertex(false);
+            submit_vertex(xyz2, true);
 			break;
 		case 0x6:
 		case 0x7:
@@ -152,6 +152,10 @@ namespace gs
 		case 0xa:
 			fog = data;
 			break;
+        case 0xd:
+            xyz3.value = data;
+            submit_vertex(xyz3, false);
+            break;
 		case 0x14:
 		case 0x15:
 			tex1[context] = data;
@@ -228,8 +232,7 @@ namespace gs
 				glDepthFunc(GL_GREATER);
 				break;
 			default:
-				fmt::print("[GS] Unknown depth function selected!\n");
-				std::abort();
+                common::Emulator::terminate("[GS] Unknown depth function selected!\n");
 			}
 
 			break;
@@ -262,8 +265,7 @@ namespace gs
 			data_written = 0;
 			break;
 		default:
-			fmt::print("[GS] Writting {:#x} to unknown address {:#x}\n", data, addr);
-			std::abort();
+            common::Emulator::terminate("[GS] Writting {:#x} to unknown address {:#x}\n", data, addr);
 		}
 
 		fmt::print("[GS] Writing {:#x} to {}\n", data, REGS[addr]);
@@ -274,8 +276,7 @@ namespace gs
 		/* HWREG is only used for GIF -> VRAM transfers */
 		if (trxdir != TRXDir::HostLocal)
 		{
-			fmt::print("[GS] Write to HWREG with invalid transfer dir!\n");
-			std::abort();
+            common::Emulator::terminate("[GS] Write to HWREG with invalid transfer dir!\n");
 			return;
 		}
 		
@@ -334,8 +335,7 @@ namespace gs
 			break;
 		}
 		default:
-			fmt::print("[GS] Unknown texture format {:#x}\n", format);
-			std::abort();
+            common::Emulator::terminate("[GS] Unknown texture format {:#x}\n", format);
 		}
 
 		/* Check if transfer has completed */
@@ -349,13 +349,26 @@ namespace gs
 		}
 	}
 
-	void GraphicsSynthesizer::submit_vertex(bool fog)
-	{
-		GSVertex vertex;
-		vertex.x = fog ? xyzf2.x : xyz2.x;
-		vertex.y = fog ? xyzf2.y : xyz2.y;
-		vertex.z = fog ? xyzf2.z : xyz2.z;
+    void GraphicsSynthesizer::submit_vertex_fog(XYZF xyzf, bool draw_kick)
+    {
+        GSVertex vertex;
+        vertex.x = xyzf.x;
+        vertex.y = xyzf.y;
+        vertex.z = xyzf.z;
+        process_vertex(vertex, draw_kick);
+    }
 
+    void GraphicsSynthesizer::submit_vertex(XYZ xyz, bool draw_kick)
+    {
+        GSVertex vertex;
+        vertex.x = xyz.x;
+        vertex.y = xyz.y;
+        vertex.z = xyz.z;
+        process_vertex(vertex, draw_kick);
+    }
+
+    void GraphicsSynthesizer::process_vertex(GSVertex vertex, bool draw_kick)
+	{
 		/* Convert the primitive coords to window coords */
 		vertex.x = (vertex.x - xyoffset[0].x_offset) / 16.0f;
 		vertex.y = (vertex.y - xyoffset[0].y_offset) / 16.0f;
@@ -363,7 +376,7 @@ namespace gs
 		/* Convert to OpenGL coords */
 		vertex.x = (vertex.x / 320.0f) - 1.0f;
 		vertex.y = 1.0f - (vertex.y / 112.0f);
-		vertex.z = vertex.z / INT_MAX;
+        vertex.z = vertex.z / static_cast<float>(INT_MAX);
 		
 		/* Set color information */
 		vertex.r = rgbaq.r / 255.0f;
@@ -372,43 +385,44 @@ namespace gs
 
 		if (!vqueue.push(vertex))
 		{
-			fmt::print("[GS] Vertex queue full!\n");
-			std::abort();
+            /* Happens when we write to XYZ3 */
+            vqueue.pop<GSVertex>();
+            vqueue.push(vertex);
 		}
 
-		if (vqueue.size() == 2)
-		{
-			switch (prim & 0x7)
-			{
-			case Primitive::Sprite:
-			{
-				GSVertex v1, v2;
-				vqueue.read(&v1); vqueue.pop();
-				vqueue.read(&v2); vqueue.pop();
-				renderer.submit_sprite(v1, v2);
-				break;
-			}
-			}
-		}
-		else if (vqueue.size() == 3)
-		{
-			switch (prim & 0x7)
-			{
-			case Primitive::Triangle:
-			{
-				GSVertex v;
-				for (int i = 0; i < 3; i++)
-				{
-					vqueue.read(&v);
-					bool f = vqueue.pop();
+        if (draw_kick)
+        {
+            switch(vqueue.size())
+            {
+            case 2:
+                switch (prim & 0x7)
+                {
+                case Primitive::Sprite:
+                    GSVertex v1, v2;
+                    vqueue.read(&v1); vqueue.pop();
+                    vqueue.read(&v2); vqueue.pop();
+                    renderer.submit_sprite(v1, v2);
+                    break;
+                }
+                break;
+            case 3:
+                switch (prim & 0x7)
+                {
+                case Primitive::Triangle:
+                    GSVertex v;
+                    for (int i = 0; i < 3; i++)
+                    {
+                        vqueue.read(&v);
+                        bool f = vqueue.pop();
 
-					assert(f);
+                        assert(f);
 
-					renderer.submit_vertex(v);
-				}
-				break;
-			}
-			}
-		}
+                        renderer.submit_vertex(v);
+                    }
+                    break;
+                }
+                break;
+            }
+        }
 	}
 }

@@ -181,7 +181,9 @@ namespace gs
 	private:
 		/* Registers the new vertex. If there are enough vertices,
 		a primitive is drawn based on the PRIM setting */
-		void submit_vertex(bool fog);
+        void submit_vertex(XYZ xyz, bool draw_kick);
+        void submit_vertex_fog(XYZF xyzf, bool draw_kick);
+        void process_vertex(GSVertex vertex, bool draw_kick);
 
 	public:
 		common::Emulator* emulator;

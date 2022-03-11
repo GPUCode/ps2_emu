@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <common/emulator.h>
+#include <stdexcept>
 
 int main()
 {
@@ -26,20 +27,28 @@ int main()
         return -1;
 
     common::Emulator* emulator = new common::Emulator;
-    while (!glfwWindowShouldClose(window))
+
+    try
     {
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-            glfwSetWindowShouldClose(window, true);
+        while (!glfwWindowShouldClose(window))
+        {
+            if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+                glfwSetWindowShouldClose(window, true);
 
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClearDepth(0.0);
-        glClear(GL_DEPTH_BUFFER_BIT);
+            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            glClearDepth(0.0);
+            glClear(GL_DEPTH_BUFFER_BIT);
 
-        /* Move the emulation one frame forward */
-        emulator->tick();
+            /* Move the emulation one frame forward */
+            emulator->tick();
 
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+            glfwSwapBuffers(window);
+            glfwPollEvents();
+        }
+    }
+    catch (std::exception& e)
+    {
+        fmt::print("{}\n", e.what());
     }
 
     delete emulator;

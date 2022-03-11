@@ -269,8 +269,7 @@ namespace ee
 							break;
 						}
 						default:
-							fmt::print("[DMAC] Unknown channel transfer with id {:d}\n", id);
-							std::abort();
+                            common::Emulator::terminate("[DMAC] Unknown channel transfer with id {:d}\n", id);
 						}
 					} /* If the transfer ended, disable channel */
 					else if (channel.end_transfer)
@@ -332,9 +331,12 @@ namespace ee
 				channel.address = channel.tag_address.address + 16;
 				channel.tag_address.value = channel.address + channel.qword_count * 16;
 				break;
+            case DMASourceID::END:
+                channel.address = channel.tag_address.address + 16;
+                channel.end_transfer = true;
+                break;
 			default:
-				fmt::print("\n[DMAC] Unrecognized GIF DMAtag id {:d}\n", tag_id);
-				std::abort();
+                common::Emulator::terminate("\n[DMAC] Unrecognized GIF DMAtag id {:d}\n", tag_id);
 			}
 
 			/* Just end transfer, since an interrupt will be raised there anyways  */
@@ -382,8 +384,7 @@ namespace ee
 				channel.tag_address.address = tag.address;
 				break;
 			default:
-				fmt::print("\n[DMAC] Unrecognized VIF{} DMAtag id {:d}\n", id, tag_id);
-				std::abort();
+                common::Emulator::terminate("\n[DMAC] Unrecognized VIF{} DMAtag id {:d}\n", id, tag_id);
 			}
 
 			/* Just end transfer, since an interrupt will be raised there anyways  */
@@ -460,8 +461,7 @@ namespace ee
 				break;
 			}
 			default:
-				fmt::print("\n[DMAC] Unrecognized SIF1 DMAtag id {:d}\n", tag_id);
-				std::abort();
+                common::Emulator::terminate("\n[DMAC] Unrecognized SIF1 DMAtag id {:d}\n", tag_id);
 			}
 
 			/* Just end transfer, since an interrupt will be raised there anyways */
@@ -471,8 +471,7 @@ namespace ee
 			break;
 		}
 		default:
-			fmt::print("[DMAC] Unknown channel {:d}\n", id);
-			std::abort();
+            common::Emulator::terminate("[DMAC] Unknown channel {:d}\n", id);
 		}
 	}
 }

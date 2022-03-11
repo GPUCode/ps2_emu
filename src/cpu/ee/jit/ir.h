@@ -53,7 +53,6 @@ namespace ee
 
             /* Operands for arithemtic operations (rd, rt, rs) */
             uint32_t destination, target, source;
-            uint16_t cycle_count;
 
             /* Keep track of the cycles between instructions */
             uint32_t cycles_till_now, cycle_count;

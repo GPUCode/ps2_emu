@@ -80,8 +80,7 @@ namespace media
 			break;
 		}
 		default:
-			fmt::print("[SIO2] Writing {:#x} to unknown address {:#x}\n", data, address);
-			std::abort();
+            common::Emulator::terminate("[SIO2] Writing {:#x} to unknown address {:#x}\n", data, address);
 		}
 	}
 	
@@ -131,8 +130,7 @@ namespace media
 			break;
 		}
 		default:
-			fmt::print("[SIO2] Unknown component {:#x}\n", current_device);
-			std::abort();
+            common::Emulator::terminate("[SIO2] Unknown component {:#x}\n", current_device);
 		}
 	}
 	

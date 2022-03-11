@@ -98,6 +98,10 @@ namespace common
         /* Various loaders */
         bool load_elf(const char* filename);
 
+        /* Terminate program */
+        template <typename... Args>
+        [[noreturn]] static void terminate(std::string_view message, Args&&... args);
+
     protected:
         void read_bios();
 
@@ -210,5 +214,12 @@ namespace common
         h->writer = (Writer<T>)writer;
         h->reader = (Reader<T>)reader;
         handlers[page] = h;
+    }
+
+    template <typename... Args>
+    void Emulator::terminate(std::string_view message, Args&&... args)
+    {
+        const auto output = fmt::vformat(message, fmt::make_format_args(std::forward<Args>(args)...));
+        throw std::runtime_error(output);
     }
 }

@@ -1,6 +1,6 @@
 #include <gs/gsrenderer.h>
 #include <glad/glad.h>
-#include <fmt/core.h>
+#include <common/emulator.h>
 
 const char* vertexShaderSource = R"(
 #version 330 core
@@ -43,8 +43,7 @@ namespace gs
         if (!success)
         {
             glGetShaderInfoLog(vertex, 512, NULL, infoLog);
-            fmt::print("[GS][OpenGL] Vertex shader compilation failed\n");
-            std::abort();
+            common::Emulator::terminate("[GS][OpenGL] Vertex shader compilation failed\n");
         }
 
         uint32_t fragment = glCreateShader(GL_FRAGMENT_SHADER);
@@ -54,8 +53,7 @@ namespace gs
         if (!success)
         {
             glGetShaderInfoLog(fragment, 512, NULL, infoLog);
-            fmt::print("[GS][OpenGL] Fragment shader compilation failed\n");
-            std::abort();
+            common::Emulator::terminate("[GS][OpenGL] Fragment shader compilation failed\n");
         }
         
         /* Link shaders */
@@ -67,8 +65,7 @@ namespace gs
         if (!success) 
         {
             glGetProgramInfoLog(program, 512, NULL, infoLog);
-            fmt::print("[GS][OpenGL] Shader linking failed\n");
-            std::abort();
+            common::Emulator::terminate("[GS][OpenGL] Shader linking failed\n");
         }
 
         /* Delete unused objects */

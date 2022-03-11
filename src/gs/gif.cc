@@ -39,8 +39,7 @@ namespace gs
 			data = status.value;
 			break;
 		default:
-			fmt::print("[GIF] Read from unknown register {}\n", REGS[offset]);
-			std::abort();
+            common::Emulator::terminate("[GIF] Read from unknown register {}\n", REGS[offset]);
 		}
 
 		return data;
@@ -60,8 +59,7 @@ namespace gs
 			
 			break;
 		default:
-			fmt::print("[GIF] Write to unknown register {}\n", REGS[offset]);
-			std::abort();
+            common::Emulator::terminate("[GIF] Write to unknown register {}\n", REGS[offset]);
 		}
 
 		fmt::print("[GIF] Writing {:#x} to {}\n", data, REGS[offset]);
@@ -144,8 +142,7 @@ namespace gs
 				break;
 			}
 			default:
-				fmt::print("[GIF] Unknown format {:d}\n", format);
-				std::abort();
+                common::Emulator::terminate("[GIF] Unknown format {:d}\n", format);
 			}
 
 			fifo.pop<uint128_t>();
@@ -223,8 +220,7 @@ namespace gs
 			break;
 		}
 		default:
-			fmt::print("[GIF] Unknown reg descritptor {:#x}!\n", desc);
-			std::abort();
+            common::Emulator::terminate("[GIF] Unknown reg descritptor {:#x}!\n", desc);
 		}
 
 		reg_count--;

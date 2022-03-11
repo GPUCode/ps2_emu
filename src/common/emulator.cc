@@ -170,7 +170,7 @@ namespace common
         reader.open("SCPH-10000.BIN", std::ios::in | std::ios::binary);
 
         if (!reader.is_open())
-            std::abort();
+            common::Emulator::terminate("[CORE] Couldn't read BIOS file!\n");
 
         reader.seekg(0);
         reader.read((char*)bios, 4 * 1024 * 1024);

@@ -1,5 +1,6 @@
 #include <cpu/ee/cop1.h>
 #include <cpu/ee/ee.h>
+#include <common/emulator.h>
 
 namespace ee
 {
@@ -19,8 +20,7 @@ namespace ee
 		case 0b011000: op_adda(instr); break;
 		case 0b011100: op_madd(instr); break;
 		default:
-			fmt::print("[COP1] Unimplemented opcode: {:#08b}\n", function);
-			std::abort();
+            common::Emulator::terminate("[COP1] Unimplemented opcode: {:#08b}\n", function);
 		}
 	}
 

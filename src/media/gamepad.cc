@@ -1,8 +1,6 @@
 #include <media/gamepad.h>
+#include <common/emulator.h>
 #include <cstring>
-#include <cstdio>
-#include <fmt/core.h>
-#include <fstream>
 
 namespace media
 {
@@ -133,8 +131,7 @@ namespace media
             break;
         }
         default:
-            fmt::print("[PAD] Unknown command {:#x}\n", cmd);
-            std::abort();
+            common::Emulator::terminate("[PAD] Unknown command {:#x}\n", cmd);
         }
 
         /* All commands return this except 0x41 - 0x43 */

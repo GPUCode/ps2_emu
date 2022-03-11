@@ -12,7 +12,7 @@ constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasi
 #define log(...) if (print_pc) fmt::print(disassembly, __VA_ARGS__)
 #endif
 
-constexpr const char* TEST_ELF = "3stars.elf";
+constexpr const char* TEST_ELF = "pillgen2.elf";
 bool load_elf = true;
 
 namespace ee
@@ -127,8 +127,7 @@ namespace ee
             case 0b101110: op_swr(); break;
             case 0b111110: op_sqc2(); break;
             default:
-                fmt::print("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
-                std::abort();
+                common::Emulator::terminate("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
             }
 
             /* Sometimes an instruction might write to GPR[0].
@@ -209,8 +208,7 @@ namespace ee
             {
             case 0b000: op_mfc0(); break;
             default:
-                fmt::print("[ERROR] Unimplemented COP0 MF0 instruction: {:#03b}\n", instr.value & 0x7);
-                std::abort();
+                common::Emulator::terminate("[ERROR] Unimplemented COP0 MF0 instruction: {:#03b}\n", instr.value & 0x7);
             }
             break;
         }
@@ -220,8 +218,7 @@ namespace ee
             {
             case 0b000: op_mtc0(); break;
             default:
-                fmt::print("[ERROR] Unimplemented COP0 MT0 instruction: {:#03b}\n", instr.value & 0x7);
-                std::abort();
+                common::Emulator::terminate("[ERROR] Unimplemented COP0 MT0 instruction: {:#03b}\n", instr.value & 0x7);
             }
             break;
         }
@@ -240,8 +237,7 @@ namespace ee
             break;
         }
 	    default:
-		    fmt::print("[ERROR] Unimplemented COP0 instruction: {:#05b}\n", type);
-		    std::abort();
+            common::Emulator::terminate("[ERROR] Unimplemented COP0 instruction: {:#05b}\n", type);
 	    }
     }
 
@@ -301,8 +297,7 @@ namespace ee
         case 0b100010: op_sub(); break;
         case 0b100000: op_add(); break;
         default:
-            fmt::print("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
-		    std::abort();
+            common::Emulator::terminate("[ERROR] Unimplemented SPECIAL instruction: {:#06b}\n", (uint16_t)instr.r_type.funct);
         }
     }
 
@@ -316,8 +311,7 @@ namespace ee
         case 0b00010: op_bltzl(); break;
         case 0b00011: op_bgezl(); break;
         default:
-            fmt::print("[ERROR] Unimplemented REGIMM instruction: {:#07b}\n", type);
-		    std::exit(1);
+            common::Emulator::terminate("[ERROR] Unimplemented REGIMM instruction: {:#07b}\n", type);
         }
     }
 
@@ -1402,8 +1396,7 @@ namespace ee
         case 0b00010: op_cfc1(); break;
         case 0b10000: cop1.execute(instr); break;
         default:
-            fmt::print("[ERROR] Unimplemented COP1 instruction {:#07b}\n", fmt);
-            std::abort();
+            common::Emulator::terminate("[ERROR] Unimplemented COP1 instruction {:#07b}\n", fmt);
         }
     }
 
@@ -1450,18 +1443,22 @@ namespace ee
         switch (fmt)
         {
         case 0b00010:
-            return vu0->op_cfc2(instr);
+            vu0->op_cfc2(instr);
+            break;
         case 0b00110:
-            return vu0->op_ctc2(instr);
+            vu0->op_ctc2(instr);
+            break;
         case 0b00001:
-            return vu0->op_qmfc2(instr);
+            vu0->op_qmfc2(instr);
+            break;
         case 0b00101:
-            return vu0->op_qmtc2(instr);
+            vu0->op_qmtc2(instr);
+            break;
         case 0b10000 ... 0b11111:
-            return vu0->special1(instr);
+            vu0->special1(instr);
+            break;
         default:
-            fmt::print("[ERROR] Unimplemented COP2 instruction {:#07b}\n", fmt);
-            std::abort();
+            common::Emulator::terminate("[ERROR] Unimplemented COP2 instruction {:#07b}\n", fmt);
         }
     }
 
@@ -1761,8 +1758,7 @@ namespace ee
             case 0b10011: op_pnor(); break;
             case 0b01110: op_pcpyud(); break;
             default:
-                fmt::print("[ERROR] Unimplemented MMI3 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
-                std::abort();
+                common::Emulator::terminate("[ERROR] Unimplemented MMI3 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
             }
             break;
         }
@@ -1773,8 +1769,7 @@ namespace ee
             case 0b01001: op_psubb(); break;
             case 0b00001: op_psubw(); break;
             default:
-                fmt::print("[ERROR] Unimplemented MMI0 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
-                std::abort();
+                common::Emulator::terminate("[ERROR] Unimplemented MMI0 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
             }
             break;
         }
@@ -1784,8 +1779,7 @@ namespace ee
             {
             case 0b10000: op_padduw(); break;
             default:
-                fmt::print("[ERROR] Unimplemented MMI1 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
-                std::abort();
+                common::Emulator::terminate("[ERROR] Unimplemented MMI1 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
             }
             break;
         }
@@ -1797,14 +1791,12 @@ namespace ee
             case 0b10010: op_pand(); break;
             case 0b10011: op_pxor(); break;
             default:
-                fmt::print("[ERROR] Unimplemented MMI2 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
-                std::abort();
+                common::Emulator::terminate("[ERROR] Unimplemented MMI2 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
             }
             break;
         }
         default:
-            fmt::print("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.funct);
-		    std::abort();
+            common::Emulator::terminate("[ERROR] Unimplemented MMI instruction: {:#05b}\n", (uint16_t)instr.r_type.funct);
         }
     }
 

@@ -33,8 +33,7 @@ namespace media
 			return result;
 		}
 		default:
-			fmt::print("[DVD] Unknown read from address {:#x}\n", address);
-			std::abort();
+            common::Emulator::terminate("[DVD] Unknown read from address {:#x}\n", address);
 		}
 	}
 	
@@ -55,8 +54,7 @@ namespace media
 			break;
 		}
 		default:
-			fmt::print("[DVD] Unknown write to address {:#x}\n", address);
-			std::abort();
+            common::Emulator::terminate("[DVD] Unknown write to address {:#x}\n", address);
 		}
 	}
 
@@ -109,8 +107,7 @@ namespace media
 			break;
 		}
 		default:
-			fmt::print("[DVD] Unknown S command {:#x}\n", S.command);
-			std::abort();
+            common::Emulator::terminate("[DVD] Unknown S command {:#x}\n", S.command);
 		}
 
 		/* Clear parameters, since we used them */
