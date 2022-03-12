@@ -1,4 +1,5 @@
 #pragma once
+#include <cpu/ee/jit/ir.h>
 #include <asmjit/asmjit.h>
 #include <robin_hood.h>
 
@@ -9,7 +10,7 @@ namespace ee
 	namespace jit
 	{
 		struct JITCompiler;
-		using PrologueFunc = void(*)(JITCompiler*);
+        using BlockFunc = void(*)(JITCompiler*);
 
 		struct JITCompiler
 		{
@@ -19,9 +20,12 @@ namespace ee
 			void run(uint32_t cycles);
 			void reset();
 
-			void lookup_next_block();
+            uint32_t get_current_pc() const;
+            IRBlock generate_ir(uint32_t pc);
 
-		private:
+            void emit_block_dispatcher(asmjit::x86::Gp& jitcompiler);
+
+        private:
 			/* Emitter */
 			asmjit::JitRuntime runtime;
 			asmjit::x86::Assembler* builder;
@@ -31,7 +35,14 @@ namespace ee
 			EmotionEngine* ee;
 
 			/* Transition from host -> JIT */
-			PrologueFunc entry;
+            BlockFunc entry;
+
+            /* Builds IR code that the JIT can convert to native */
+            IRBuilder irbuilder;
+
+        public:
+            /* Maps a PS2 address to a code block */
+            robin_hood::unordered_flat_map<uint32_t, BlockFunc> block_cache;
 		};
 	}
 }

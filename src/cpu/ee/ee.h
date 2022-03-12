@@ -161,6 +161,9 @@ namespace ee
         uint32_t exception_addr[2] = { 0x80000000, 0xBFC00200 };
         bool skip_branch_delay = false;
 
+        /* Used by the JIT for cycle counting */
+        uint32_t cycles_to_execute = 5;
+
         /* EE memory */
         uint8_t scratchpad[16 * 1024];
         uint8_t* ram = nullptr;
