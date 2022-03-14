@@ -3,7 +3,7 @@
 
 namespace ee
 {
-	class EmotionEngine;
+    struct EmotionEngine;
 	struct Instruction;
 }
 

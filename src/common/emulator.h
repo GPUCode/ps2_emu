@@ -7,9 +7,9 @@
 #include <fstream>
 #include <type_traits>
 
-namespace ee 
+namespace ee
 {
-    class EmotionEngine;
+    struct EmotionEngine;
     struct DMAController;
 }
 

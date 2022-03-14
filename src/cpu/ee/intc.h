@@ -29,7 +29,7 @@ namespace ee
 		uint32_t intc_mask;
 	};
 
-	class EmotionEngine;
+    struct EmotionEngine;
 	class INTC
 	{
 	public:

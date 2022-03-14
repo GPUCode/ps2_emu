@@ -4,11 +4,12 @@
 #include <cpu/ee/cop1.h>
 #include <cpu/ee/intc.h>
 #include <cpu/ee/timers.h>
+#include <cpu/ee/jit/jit.h>
 
 namespace ee
 {
     /* Nice interface for instructions */
-    struct Instruction
+    struct __attribute__((packed)) Instruction
     {
         union
         {
@@ -91,6 +92,8 @@ namespace ee
     /* A class implemeting the MIPS R5900 CPU. */
     struct EmotionEngine
     {
+        friend jit::BlockFunc lookup_next_block(EmotionEngine* ee);
+
         EmotionEngine(common::Emulator* parent);
         ~EmotionEngine();
 
@@ -162,7 +165,7 @@ namespace ee
         bool skip_branch_delay = false;
 
         /* Used by the JIT for cycle counting */
-        uint32_t cycles_to_execute = 5;
+        int cycles_to_execute = 0;
 
         /* EE memory */
         uint8_t scratchpad[16 * 1024];
@@ -180,9 +183,12 @@ namespace ee
         INTC intc;
         Timers timers;
 
+        /* EE JIT compiler */
+        jit::JITCompiler* compiler;
+
         /* Logging */
         std::FILE* disassembly;
-        bool print_pc = false;
+        bool print_pc = true;
 
     protected:
         common::Emulator* emulator;

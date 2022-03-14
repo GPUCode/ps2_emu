@@ -44,6 +44,7 @@ set(HEADERS
     src/common/emulator.h
     src/cpu/ee/ee.h
     src/cpu/ee/timers.h
+    src/cpu/ee/opcode.h
     src/cpu/iop/iop.h
     src/cpu/iop/dma.h
     src/cpu/iop/timers.h

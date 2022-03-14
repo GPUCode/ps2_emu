@@ -5,11 +5,11 @@
 #include <fmt/color.h>
 #include <unordered_map>
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 #define log(...) (void)0
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
-#define log(...) if (print_pc) fmt::print(disassembly, __VA_ARGS__)
+#define log(...) fmt::print(disassembly, __VA_ARGS__)
 #endif
 
 constexpr const char* TEST_ELF = "3stars.elf";
@@ -25,17 +25,16 @@ namespace ee
 
         /* Allocate the 32MB of EE memory */
         ram = new uint8_t[32 * 1024 * 1024];
+        compiler = new jit::JITCompiler(this);
 
         /* Reset CPU state. */
         reset();
-
-        jit::JITCompiler compiler(this);
-        compiler.reset();
     }
 
     EmotionEngine::~EmotionEngine()
     {
         delete[] ram;
+        delete compiler;
         std::fclose(disassembly);
     }
 
@@ -44,36 +43,35 @@ namespace ee
         /* Reset PC. */
         pc = 0xbfc00000;
 
+        /* Build the JIT prologue block */
+        compiler->reset();
+
         /* Reset instruction holders */
-        direct_jump();
+        next_instr = {};
+        next_instr.value = read<uint32_t>(pc);
+        next_instr.pc = pc;
 
         /* Set this to zero */
-        gpr[0].dword[0] = gpr[0].dword[1] = 0;
+        gpr[0].qword = 0;
 
         /* Set EE pRId */
-        cop0.prid = 0x00002E20;
+        cop0.prid = 0x2E20;
     }
 
     void EmotionEngine::tick(uint32_t cycles)
     {
+        cycles_to_execute = cycles;
+
+        compiler->run();
+
         /* Tick the cpu for the amount of cycles requested */
-        for (int cycle = cycles; cycle > 0; cycle--)
+        /*for (int cycle = cycles; cycle > 0; cycle--)
         {
-            /* Handle branch delay slots by prefetching the next one */
             instr = next_instr;
 
-            /* Read next instruction */
             direct_jump();
 
             log("PC: {:#x} instruction: {:#x} ", instr.pc, instr.value);
-
-            /* Skip the delay slot for any BEQ* instructions */
-            if (skip_branch_delay)
-            {
-                skip_branch_delay = false;
-                log("SKIPPED delay slot\n");
-                continue;
-            }
 
             switch (instr.opcode)
             {
@@ -130,10 +128,8 @@ namespace ee
                 common::Emulator::terminate("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
             }
 
-            /* Sometimes an instruction might write to GPR[0].
-               To avoid branches, reset the register each time */
             gpr[0].qword = 0;
-        }
+        }*/
 
         /* Increment COP0 counter */
         cop0.count += cycles;
@@ -372,7 +368,7 @@ namespace ee
 
         int32_t offset = imm << 2;
         if (gpr[rs].dword[0] != gpr[rt].dword[0])
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
     
         next_instr.is_delay_slot = true;
         log("BNE: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, gpr[rt].dword[0], rs, gpr[rs].dword[0], offset);
@@ -505,8 +501,7 @@ namespace ee
     void EmotionEngine::op_j()
     {
         uint32_t instr_index = instr.j_type.target;
-
-        pc = (pc & 0xF0000000) | (instr_index << 2);
+        pc = ((instr.pc + 4) & 0xF0000000) | (instr_index << 2);
 
         next_instr.is_delay_slot = true;
         log("J: Jumping to PC = {:#x}\n", pc);
@@ -579,7 +574,7 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = gpr[rs].dword[0];
         if (reg <= 0)
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
 
         next_instr.is_delay_slot = true;
         log("BLEZ: IF GPR[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
@@ -606,7 +601,7 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = gpr[rs].dword[0];
         if (reg > 0)
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
 
         next_instr.is_delay_slot = true;
         log("BGTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
@@ -676,7 +671,7 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = gpr[rs].dword[0];
         if (reg < 0)
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
 
         next_instr.is_delay_slot = true;
         log("BLTZ: IF GPR[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
@@ -1079,9 +1074,9 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = gpr[rs].dword[0];
         if (reg < 0)
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
         else
-            skip_branch_delay = true;
+            direct_jump();
 
         next_instr.is_delay_slot = !skip_branch_delay;
         log("BLTZL: IF GPR[{:d}] ({:#x}) < 0 THEN PC += {:#x}\n", rs, reg, offset);
@@ -1095,9 +1090,9 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = gpr[rs].dword[0];
         if (reg >= 0)
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
         else
-            skip_branch_delay = true;
+            direct_jump();
 
         next_instr.is_delay_slot = !skip_branch_delay;
         log("BGEZL: IF GPR[{:d}] ({:#x}) >= 0 THEN PC += {:#x}\n", rs, reg, offset);
@@ -1172,9 +1167,9 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = gpr[rs].dword[0];
         if (reg <= 0)
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
         else
-            skip_branch_delay = true;
+            direct_jump();
 
         next_instr.is_delay_slot = !skip_branch_delay;
         log("BLEZL: IF GPR[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, gpr[rs].dword[0], offset);
@@ -1852,8 +1847,8 @@ namespace ee
     {
         uint32_t instr_index = instr.j_type.target;
     
-        gpr[31].dword[0] = pc;
-        pc = (pc & 0xF0000000) | (instr_index << 2);
+        gpr[31].dword[0] = instr.pc + 8;
+        pc = ((instr.pc + 4) & 0xF0000000) | (instr_index << 2);
     
         next_instr.is_delay_slot = true;
         log("JAL: Jumping to PC = {:#x} with return link address {:#x}\n", pc, gpr[31].dword[0]);
@@ -1879,7 +1874,7 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = (int64_t)gpr[rs].dword[0];
         if (reg >= 0)
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
 
         next_instr.is_delay_slot = true;
         log("BGEZ: IF GPR[{:d}] ({:#x}) >= 0 THEN PC += {:#x}\n", rs, reg, offset);
@@ -1989,9 +1984,9 @@ namespace ee
 
         int32_t offset = imm << 2;
         if (gpr[rs].dword[0] == gpr[rt].dword[0])
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
         else
-            skip_branch_delay = true;
+            direct_jump();
 
         next_instr.is_delay_slot = !skip_branch_delay;
         log("BEQL: IF GPR[{:d}] ({:#x}) == GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);
@@ -2025,9 +2020,9 @@ namespace ee
 
         int32_t offset = imm << 2;
         if (gpr[rs].dword[0] != gpr[rt].dword[0])
-            pc += offset - 4;
+            pc = instr.pc + 4 + offset;
         else
-            skip_branch_delay = true;
+            direct_jump();
 
         next_instr.is_delay_slot = !skip_branch_delay;
         log("BNEL: IF GPR[{:d}] ({:#x}) != GPR[{:d}] ({:#x}) THEN PC += {:#x}\n", rs, gpr[rs].dword[0], rt, gpr[rt].dword[0], offset);

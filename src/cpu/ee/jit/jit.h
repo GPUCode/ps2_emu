@@ -10,24 +10,32 @@ namespace ee
 	namespace jit
 	{
 		struct JITCompiler;
-        using BlockFunc = void(*)(JITCompiler*);
+        using BlockFunc = void(*)(EmotionEngine*);
 
 		struct JITCompiler
 		{
+            friend BlockFunc lookup_next_block(EmotionEngine* compiler);
+
 			JITCompiler(EmotionEngine* parent);
 			~JITCompiler();
 
-			void run(uint32_t cycles);
+            void run();
 			void reset();
 
-            uint32_t get_current_pc() const;
-            IRBlock generate_ir(uint32_t pc);
+        private:
+            BlockFunc emit_native(IRBlock& block);
+            void emit_block_dispatcher();
 
-            void emit_block_dispatcher(asmjit::x86::Gp& jitcompiler);
+            void emit_register_flush();
+            void emit_register_restore();
+
+            /* Native implementations of IR instructions */
+            void emit_fallback(IRInstruction& instr);
 
         private:
 			/* Emitter */
 			asmjit::JitRuntime runtime;
+            asmjit::CodeHolder* code;
 			asmjit::x86::Assembler* builder;
 			asmjit::StringLogger logger;
 
