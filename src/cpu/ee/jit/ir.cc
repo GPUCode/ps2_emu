@@ -1,5 +1,6 @@
 #include <cpu/ee/jit/ir.h>
 #include <cpu/ee/ee.h>
+#include <cpu/ee/opcode.h>
 
 namespace ee
 {
@@ -35,6 +36,14 @@ namespace ee
             bool branch_delay = false;
             do
             {
+                if (pc == 0x9fc4255c)
+                {
+                    for (int i = 0; i < 32; i++)
+                        fmt::print("GPR[{}] = {:#x}\n", i, ee->gpr[i].dword[0]);
+
+                    //common::Emulator::terminate("");
+                }
+
                 uint32_t value = ee->read<uint32_t>(pc);
                 pc += 4;
 
@@ -42,7 +51,8 @@ namespace ee
                 instr.cycles_till_now = block.total_cycles;
                 block.add_instruction(instr);
 
-                branch_delay = block.size() > 1 ? block[block.size() - 2].is_branch : false;
+                branch_delay = block.size() > 1 ? (block[block.size() - 2].is_branch || block[block.size() - 1].is_direct)
+                                                : false;
             } while (!branch_delay);
 
 			return block;
@@ -77,7 +87,7 @@ namespace ee
                     {
                     case 0b000:
                         ir_instr.operation = IROperation::MoveFromCop0;
-                        ir_instr.handler = jit_callable<&EmotionEngine::op_mfc0>;
+                        ir_instr.handler = op_mfc0;
                         break;
                     default:
                         common::Emulator::terminate("[JIT] Failed to decode COP0 MF0 instruction: {:#03b}\n", instr.value & 0x7);
@@ -88,7 +98,7 @@ namespace ee
                     {
                     case 0b000:
                         ir_instr.operation = IROperation::MoveToCop0;
-                        ir_instr.handler = jit_callable<&EmotionEngine::op_mtc0>;
+                        ir_instr.handler = op_mtc0;
                         break;
                     default:
                         common::Emulator::terminate("[JIT] Failed to decode COP0 MT0 instruction: {:#03b}\n", instr.value & 0x7);
@@ -99,20 +109,21 @@ namespace ee
                     {
                     case 0b000010:
                         ir_instr.operation = IROperation::None;
-                        ir_instr.handler = jit_callable<&EmotionEngine::op_tlbwi>;
+                        ir_instr.handler = op_tlbwi;
                         break;
                     case 0b111001:
                         ir_instr.operation = IROperation::DisableInterrupts;
-                        ir_instr.handler = jit_callable<&EmotionEngine::op_di>;
+                        ir_instr.handler = op_di;
                         break;
                     case 0b011000:
                         ir_instr.operation = IROperation::ExceptionReturn;
                         ir_instr.is_branch = true;
-                        ir_instr.handler = jit_callable<&EmotionEngine::op_eret>;
+                        ir_instr.is_direct = true;
+                        ir_instr.handler = op_eret;
                         break;
                     case 0b111000:
                         ir_instr.operation = IROperation::EnableInterrupts;
-                        ir_instr.handler = jit_callable<&EmotionEngine::op_ei>;
+                        ir_instr.handler = op_ei;
                         break;
                     default:
                         common::Emulator::terminate("[JIT] Failed to decode COP0 TLB instruction {:#08b}\n", instr.value & 0x3f);
@@ -130,192 +141,196 @@ namespace ee
                 {
                 case 0b000000:
                     ir_instr.operation = value == 0 ? IROperation::None : IROperation::LogicalShiftLeftWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_sll>;
+                    ir_instr.handler = op_sll;
                     break;
                 case 0b001000:
                     ir_instr.operation = IROperation::Jump;
                     ir_instr.is_branch = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_jr>;
+                    ir_instr.handler = op_jr;
                     break;
                 case 0b001111:
                     ir_instr.operation = IROperation::None;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_sync>;
+                    ir_instr.handler = op_sync;
                     break;
                 case 0b001001:
                     ir_instr.operation = IROperation::JumpLink;
                     ir_instr.is_branch = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_jalr>;
+                    ir_instr.handler = op_jalr;
                     break;
                 case 0b000011:
                     ir_instr.operation = IROperation::ArithmeticShiftRightWord;
                     ir_instr.immediate_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_sra>;
+                    ir_instr.handler = op_sra;
                     break;
                 case 0b100001:
                     ir_instr.operation = IROperation::AddWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_addu>;
+                    ir_instr.handler = op_addu;
                     break;
                 case 0b101101:
                     ir_instr.operation = IROperation::AddDword;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_daddu>;
+                    ir_instr.handler = op_daddu;
                     break;
                 case 0b100101:
                     ir_instr.operation = IROperation::OrWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_or>;
+                    ir_instr.handler = op_or;
                     break;
                 case 0b011000:
                     ir_instr.operation = IROperation::MulWord;
                     ir_instr.signed_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_mult>;
+                    ir_instr.handler = op_mult;
                     break;
                 case 0b011011:
                     ir_instr.operation = IROperation::DivWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_divu>;
+                    ir_instr.handler = op_divu;
                     break;
                 case 0b010010:
                     ir_instr.operation = IROperation::MoveFromLo;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_mflo>;
+                    ir_instr.handler = op_mflo;
                     break;
                 case 0b011010:
                     ir_instr.operation = IROperation::DivWord;
                     ir_instr.signed_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_div>;
+                    ir_instr.handler = op_div;
                     break;
                 case 0b010000:
                     ir_instr.operation = IROperation::MoveFromHi;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_mfhi>;
+                    ir_instr.handler = op_mfhi;
                     break;
                 case 0b101011:
                     ir_instr.operation = IROperation::SetLessThanWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_sltu>;
+                    ir_instr.handler = op_sltu;
                     break;
                 case 0b100011:
                     ir_instr.operation = IROperation::SubWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_subu>;
+                    ir_instr.handler = op_subu;
                     break;
                 case 0b001011:
                     ir_instr.operation = IROperation::Move;
                     ir_instr.condition = BranchCond::NotEqual;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_movn>;
+                    ir_instr.handler = op_movn;
                     break;
                 case 0b101010:
                     ir_instr.operation = IROperation::SetLessThanWord;
                     ir_instr.signed_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_slt>;
+                    ir_instr.handler = op_slt;
                     break;
                 case 0b100100:
                     ir_instr.operation = IROperation::AndWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_and>;
+                    ir_instr.handler = op_and;
                     break;
                 case 0b000010:
                     ir_instr.operation = IROperation::LogicalShiftRightWord;
                     ir_instr.immediate_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_srl>;
+                    ir_instr.handler = op_srl;
                     break;
                 case 0b111100:
                     ir_instr.operation = IROperation::LogicalShiftLeftDword;
                     ir_instr.immediate_data = true;
                     ir_instr.shift += 32;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_dsll32>;
+                    ir_instr.handler = op_dsll32;
                     break;
                 case 0b111111:
                     ir_instr.operation = IROperation::ArithmeticShiftRightDword;
                     ir_instr.immediate_data = true;
                     ir_instr.shift += 32;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_dsra32>;
+                    ir_instr.handler = op_dsra32;
                     break;
                 case 0b111000:
                     ir_instr.operation = IROperation::LogicalShiftLeftDword;
                     ir_instr.immediate_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_dsll>;
+                    ir_instr.handler = op_dsll;
                     break;
                 case 0b010111:
                     ir_instr.operation = IROperation::ArithmeticShiftRightDword;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_dsrav>;
+                    ir_instr.handler = op_dsrav;
                     break;
                 case 0b001010:
                     ir_instr.operation = IROperation::Move;
                     ir_instr.condition = BranchCond::Equal;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_movz>;
+                    ir_instr.handler = op_movz;
                     break;
                 case 0b010100:
                     ir_instr.operation = IROperation::LogicalShiftLeftDword;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_dsllv>;
+                    ir_instr.handler = op_dsllv;
                     break;
                 case 0b000100:
                     ir_instr.operation = IROperation::LogicalShiftLeftWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_sllv>;
+                    ir_instr.handler = op_sllv;
                     break;
                 case 0b000111:
                     ir_instr.operation = IROperation::ArithmeticShiftRightWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_srav>;
+                    ir_instr.handler = op_srav;
                     break;
                 case 0b100111:
                     ir_instr.operation = IROperation::NorWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_nor>;
+                    ir_instr.handler = op_nor;
                     break;
                 case 0b111010:
                     ir_instr.operation = IROperation::LogicalShiftRightDword;
                     ir_instr.immediate_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_dsrl>;
+                    ir_instr.handler = op_dsrl;
                     break;
                 case 0b000110:
                     ir_instr.operation = IROperation::LogicalShiftRightWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_srlv>;
+                    ir_instr.handler = op_srlv;
                     break;
                 case 0b111110:
                     ir_instr.operation = IROperation::LogicalShiftRightDword;
                     ir_instr.immediate_data = true;
                     ir_instr.shift += 32;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_dsrl32>;
+                    ir_instr.handler = op_dsrl32;
                     break;
                 case 0b001100:
                     ir_instr.operation = IROperation::Syscall;
                     ir_instr.is_branch = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_syscall>;
+                    ir_instr.is_direct = true;
+                    ir_instr.handler = op_syscall;
                     break;
                 case 0b101000:
                     ir_instr.operation = IROperation::MoveFromSa;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_mfsa>;
+                    ir_instr.handler = op_mfsa;
                     break;
                 case 0b010001:
                     ir_instr.operation = IROperation::MoveToHi;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_mthi>;
+                    ir_instr.handler = op_mthi;
                     break;
                 case 0b010011:
                     ir_instr.operation = IROperation::MoveToLo;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_mtlo>;
+                    ir_instr.handler = op_mtlo;
                     break;
                 case 0b101001:
                     ir_instr.operation = IROperation::MoveToSa;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_mtsa>;
+                    ir_instr.handler = op_mtsa;
                     break;
                 case 0b101111:
                     ir_instr.operation = IROperation::SubDword;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_dsubu>;
+                    ir_instr.handler = op_dsubu;
                     break;
                 case 0b100110:
                     ir_instr.operation = IROperation::XorWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_xor>;
+                    ir_instr.handler = op_xor;
                     break;
                 case 0b011001:
                     ir_instr.operation = IROperation::MulWord;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_multu>;
+                    ir_instr.handler = op_multu;
                     break;
                 case 0b111011:
                     ir_instr.operation = IROperation::ArithmeticShiftRightDword;
                     ir_instr.immediate_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_dsra>;
+                    ir_instr.handler = op_dsra;
                     break;
                 case 0b100010:
                     ir_instr.operation = IROperation::SubWord;
                     ir_instr.signed_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_sub>;
+                    ir_instr.handler = op_sub;
                     break;
                 case 0b100000:
                     ir_instr.operation = IROperation::AddWord;
                     ir_instr.signed_data = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_add>;
+                    ir_instr.handler = op_add;
+                    break;
+                case 0b001101:
+                    ir_instr.operation = IROperation::None;
                     break;
                 default:
                     common::Emulator::terminate("[JIT] Failed to decode SPECIAL instruction: {:#06b}\n", type);
@@ -324,56 +339,157 @@ namespace ee
             }
             //case COP1_OPCODE: op_cop1(); break;
             //case 0b010010: op_cop2(); break;
+            case 0b011100:
+            {
+                uint16_t type = instr.r_type.funct;
+                switch (type)
+                {
+                case 0b100000:
+                    ir_instr.operation = IROperation::AddDword;
+                    ir_instr.handler = op_madd1;
+                    break;
+                case 0b000000:
+                    ir_instr.operation = IROperation::AddDword;
+                    ir_instr.handler = op_madd;
+                    break;
+                case 0b011011:
+                    ir_instr.operation = IROperation::DivWord;
+                    ir_instr.handler = op_divu1;
+                    break;
+                case 0b010010:
+                    ir_instr.operation = IROperation::MoveFromLo;
+                    ir_instr.handler = op_mflo1;
+                    break;
+                case 0b011000:
+                    ir_instr.operation = IROperation::MulDword;
+                    ir_instr.handler = op_mult1;
+                    break;
+                case 0b000100:
+                    ir_instr.operation = IROperation::MulDword;
+                    ir_instr.handler = op_plzcw;
+                    break;
+                case 0b010000:
+                    ir_instr.operation = IROperation::MulDword;
+                    ir_instr.handler = op_mfhi1;
+                    break;
+                case 0b010001:
+                    ir_instr.operation = IROperation::MulDword;
+                    ir_instr.handler = op_mthi1;
+                    break;
+                case 0b010011:
+                    ir_instr.operation = IROperation::MulDword;
+                    ir_instr.handler = op_mtlo1;
+                    break;
+                case 0b101001:
+                {
+                    switch (instr.r_type.sa)
+                    {
+                    case 0b10010:
+                        ir_instr.operation = IROperation::MulDword;
+                        ir_instr.handler = op_por;
+                        break;
+                    case 0b11011:
+                        ir_instr.operation = IROperation::MulDword;
+                        ir_instr.handler = op_pcpyh;
+                        break;
+                    case 0b10011:
+                        ir_instr.operation = IROperation::MulDword;
+                        ir_instr.handler = op_pnor;
+                        break;
+                    case 0b01110:
+                        ir_instr.operation = IROperation::MulDword;
+                        ir_instr.handler = op_pcpyud;
+                        break;
+                    default:
+                        common::Emulator::terminate("[ERROR] Unimplemented MMI3 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
+                    }
+                    break;
+                }
+                case 0b001000:
+                {
+                    switch (instr.r_type.sa)
+                    {
+                    case 0b01001:
+                        ir_instr.operation = IROperation::MulDword;
+                        ir_instr.handler = op_psubb;
+                        break;
+                    case 0b00001:
+                        ir_instr.operation = IROperation::MulDword;
+                        ir_instr.handler = op_psubw;
+                        break;
+                    default:
+                        common::Emulator::terminate("[ERROR] Unimplemented MMI0 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
+                    }
+                    break;
+                }
+                case 0b101000:
+                {
+                    switch (instr.r_type.sa)
+                    {
+                    case 0b10000:
+                        ir_instr.operation = IROperation::MulDword;
+                        ir_instr.handler = op_padduw;
+                        break;
+                    default:
+                        common::Emulator::terminate("[ERROR] Unimplemented MMI1 instruction: {:#07b}\n", (uint16_t)instr.r_type.sa);
+                    }
+                    break;
+                }
+                default:
+                    common::Emulator::terminate("[JIT] Failed to decode MMI instruction: {:#06b}\n", type);
+                }
+                break;
+            }
             case 0b101011:
                 ir_instr.operation = IROperation::StoreWord;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_sw>;
+                ir_instr.handler = op_sw;
                 break;
             case 0b001010:
                 ir_instr.operation = IROperation::SetLessThanWord;
                 ir_instr.immediate_data = true;
                 ir_instr.signed_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_slti>;
+                ir_instr.handler = op_slti;
                 break;
             case 0b000101:
                 ir_instr.operation = IROperation::Branch;
                 ir_instr.condition = BranchCond::NotEqual;
                 ir_instr.is_branch = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_bne>;
+                ir_instr.handler = op_bne;
                 break;
             case 0b001101:
                 ir_instr.operation = IROperation::OrWord;
                 ir_instr.immediate_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_ori>;
+                ir_instr.handler = op_ori;
                 break;
             case 0b001000:
                 ir_instr.operation = IROperation::AddWord;
                 ir_instr.immediate_data = true;
                 ir_instr.signed_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_addi>;
+                ir_instr.handler = op_addi;
                 break;
             case 0b011110:
                 ir_instr.operation = IROperation::LoadQword;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lq>;
+                ir_instr.handler = op_lq;
                 break;
             case 0b001111:
                 ir_instr.operation = IROperation::LoadUpperImmediate;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lui>;
+                ir_instr.handler = op_lui;
                 break;
             case 0b001001:
                 ir_instr.operation = IROperation::AddWord;
                 ir_instr.immediate_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_addiu>;
+                ir_instr.handler = op_addiu;
                 break;
             case 0b111111:
-                ir_instr.operation = IROperation::StoreQword;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_sq>;
+                ir_instr.operation = IROperation::StoreDword;
+                ir_instr.handler = op_sd;
                 break;
             case 0b000011:
                 ir_instr.operation = IROperation::JumpLink;
                 ir_instr.immediate_data = true;
                 ir_instr.immediate = instr.j_type.target;
                 ir_instr.is_branch = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_jal>;
+                ir_instr.handler = op_jal;
                 break;
             case 0b000001:
             {
@@ -384,25 +500,27 @@ namespace ee
                     ir_instr.operation = IROperation::Branch;
                     ir_instr.condition = BranchCond::GreaterThanOrEqual;
                     ir_instr.is_branch = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_bgez>;
+                    ir_instr.handler = op_bgez;
                     break;
                 case 0b00000:
                     ir_instr.operation = IROperation::Branch;
                     ir_instr.condition = BranchCond::LessThan;
                     ir_instr.is_branch = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_bltz>;
+                    ir_instr.handler = op_bltz;
                     break;
                 case 0b00010:
                     ir_instr.operation = IROperation::BranchLikely;
                     ir_instr.condition = BranchCond::LessThan;
                     ir_instr.is_branch = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_bltzl>;
+                    ir_instr.is_likely_branch = true;
+                    ir_instr.handler = op_bltzl;
                     break;
                 case 0b00011:
                     ir_instr.operation = IROperation::BranchLikely;
                     ir_instr.condition = BranchCond::GreaterThanOrEqual;
                     ir_instr.is_branch = true;
-                    ir_instr.handler = jit_callable<&EmotionEngine::op_bgezl>;
+                    ir_instr.is_likely_branch = true;
+                    ir_instr.handler = op_bgezl;
                     break;
                 default:
                     common::Emulator::terminate("[JIT] Failed to decode REGIMM instruction: {:#07b}\n", type);
@@ -412,152 +530,155 @@ namespace ee
             case 0b001100:
                 ir_instr.operation = IROperation::AndWord;
                 ir_instr.immediate_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_andi>;
+                ir_instr.handler = op_andi;
                 break;
             case 0b000100:
                 ir_instr.operation = IROperation::Branch;
                 ir_instr.condition = BranchCond::Equal;
                 ir_instr.is_branch = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_beq>;
+                ir_instr.handler = op_beq;
                 break;
             case 0b010100:
                 ir_instr.operation = IROperation::BranchLikely;
                 ir_instr.condition = BranchCond::Equal;
                 ir_instr.is_branch = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_beql>;
+                ir_instr.is_likely_branch = true;
+                ir_instr.handler = op_beql;
                 break;
             case 0b001011:
                 ir_instr.operation = IROperation::SetLessThanWord;
                 ir_instr.immediate_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_sltiu>;
+                ir_instr.handler = op_sltiu;
                 break;
             case 0b010101:
                 ir_instr.operation = IROperation::BranchLikely;
                 ir_instr.condition = BranchCond::NotEqual;
                 ir_instr.is_branch = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_bnel>;
+                ir_instr.is_likely_branch = true;
+                ir_instr.handler = op_bnel;
                 break;
             case 0b100000:
                 ir_instr.operation = IROperation::LoadByte;
                 ir_instr.signed_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lb>;
+                ir_instr.handler = op_lb;
                 break;
             case 0b111001:
                 ir_instr.operation = IROperation::StoreFloat;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_swc1>;
+                ir_instr.handler = op_swc1;
                 break;
             case 0b100100:
                 ir_instr.operation = IROperation::LoadByte;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lbu>;
+                ir_instr.handler = op_lbu;
                 break;
             case 0b110111:
                 ir_instr.operation = IROperation::LoadDword;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_ld>;
+                ir_instr.handler = op_ld;
                 break;
             case 0b000010:
                 ir_instr.operation = IROperation::Jump;
                 ir_instr.immediate_data = true;
                 ir_instr.immediate = instr.j_type.target;
                 ir_instr.is_branch = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_j>;
+                ir_instr.handler = op_j;
                 break;
             case 0b100011:
                 ir_instr.operation = IROperation::LoadWord;
                 ir_instr.signed_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lw>;
+                ir_instr.handler = op_lw;
                 break;
             case 0b101000:
                 ir_instr.operation = IROperation::StoreByte;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_sb>;
+                ir_instr.handler = op_sb;
                 break;
             case 0b000110:
                 ir_instr.operation = IROperation::Branch;
                 ir_instr.condition = BranchCond::LessThanOrEqual;
                 ir_instr.is_branch = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_blez>;
+                ir_instr.handler = op_blez;
                 break;
             case 0b000111:
                 ir_instr.operation = IROperation::Branch;
                 ir_instr.condition = BranchCond::GreaterThan;
                 ir_instr.is_branch = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_bgtz>;
+                ir_instr.handler = op_bgtz;
                 break;
             case 0b100101:
                 ir_instr.operation = IROperation::LoadHalfWord;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lhu>;
+                ir_instr.handler = op_lhu;
                 break;
             case 0b101001:
                 ir_instr.operation = IROperation::StoreHalfWord;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_sh>;
+                ir_instr.handler = op_sh;
                 break;
             case 0b001110:
                 ir_instr.operation = IROperation::XorWord;
                 ir_instr.immediate_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_xori>;
+                ir_instr.handler = op_xori;
                 break;
             case 0b011001:
                 ir_instr.operation = IROperation::AddDword;
                 ir_instr.immediate_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_daddiu>;
+                ir_instr.handler = op_daddiu;
                 break;
             case 0b011111:
                 ir_instr.operation = IROperation::StoreQword;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_sq>;
+                ir_instr.handler = op_sq;
                 break;
             case 0b100001:
                 ir_instr.operation = IROperation::LoadHalfWord;
                 ir_instr.signed_data = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lh>;
+                ir_instr.handler = op_lh;
                 break;
             case 0b101111:
                 ir_instr.operation = IROperation::None;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_cache>;
+                ir_instr.handler = op_cache;
                 break;
             case 0b100111:
                 ir_instr.operation = IROperation::LoadWord;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lwu>;
+                ir_instr.handler = op_lwu;
                 break;
             case 0b011010:
                 ir_instr.operation = IROperation::LoadDwordLeft;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_ldl>;
+                ir_instr.handler = op_ldl;
                 break;
             case 0b011011:
                 ir_instr.operation = IROperation::LoadDwordRight;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_ldr>;
+                ir_instr.handler = op_ldr;
                 break;
             case 0b101100:
                 ir_instr.operation = IROperation::StoreDwordLeft;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_sdl>;
+                ir_instr.handler = op_sdl;
                 break;
             case 0b101101:
                 ir_instr.operation = IROperation::StoreDwordRight;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_sdr>;
+                ir_instr.handler = op_sdr;
                 break;
             case 0b110001:
                 ir_instr.operation = IROperation::LoadFloat;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lwc1>;
+                ir_instr.handler = op_lwc1;
                 break;
             case 0b010110:
                 ir_instr.operation = IROperation::BranchLikely;
                 ir_instr.condition = BranchCond::LessThanOrEqual;
                 ir_instr.is_branch = true;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_blezl>;
+                ir_instr.is_likely_branch = true;
+                ir_instr.handler = op_blezl;
                 break;
             case 0b100010:
                 ir_instr.operation = IROperation::LoadWordLeft;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lwl>;
+                ir_instr.handler = op_lwl;
                 break;
             case 0b100110:
                 ir_instr.operation = IROperation::LoadWordRight;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_lwr>;
+                ir_instr.handler = op_lwr;
                 break;
             case 0b101010:
                 ir_instr.operation = IROperation::StoreWordLeft;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_swl>;
+                ir_instr.handler = op_swl;
                 break;
             case 0b101110:
                 ir_instr.operation = IROperation::StoreWordRight;
-                ir_instr.handler = jit_callable<&EmotionEngine::op_swr>;
+                ir_instr.handler = op_swr;
                 break;
             default:
                 common::Emulator::terminate("[JIT] Failed to decode opcode: {:#06b}\n", instr.opcode & 0x3F);

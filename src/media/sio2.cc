@@ -25,8 +25,7 @@ namespace media
 		case 0x70: return 0xf; /* Always equal to 0xF? */
 		case 0x74: return 0; /* Unknown */
 		default:
-			fmt::print("[SIO2] Writing to unknown address {:#x}\n", address);
-			std::abort();
+			common::Emulator::terminate("[SIO2] Writing to unknown address {:#x}\n", address);
 		}
 	}
 
@@ -95,8 +94,7 @@ namespace media
 			auto params = send3[command.index];
 			if (!params)
 			{
-				fmt::print("[SIO2] SEND3 parameter empty!\n");
-				std::abort();
+				common::Emulator::terminate("[SIO2] SEND3 parameter empty!\n");
 			}
 
 			/* Read the following data size */

@@ -191,8 +191,7 @@ namespace iop
 							break;
 						}
 						default:
-							fmt::print("[IOP DMA] Unknown channel {:d} needs data transfer!\n", id);
-							std::abort();
+							common::Emulator::terminate("[IOP DMA] Unknown channel {:d} needs data transfer!\n", id);
 						}
 					}
 					else if (channel.end_transfer)
@@ -311,8 +310,7 @@ namespace iop
 			break;
 		}
 		default:
-			fmt::print("[IOP DMA] Unknown channel {:d}\n", id);
-			std::abort();
+			common::Emulator::terminate("[IOP DMA] Unknown channel {:d}\n", id);
 		}
 	}
 }

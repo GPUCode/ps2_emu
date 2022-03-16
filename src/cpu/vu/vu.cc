@@ -22,8 +22,7 @@ namespace vu
 		case 0b101000: op_vadd(vu_instr); break;
 		case 0b111100 ... 0b111111: special2(instr); break;
 		default:
-			fmt::print("[VU0] Unimplemented special1 macro operation {:#08b}\n", function);
-			std::abort();
+			common::Emulator::terminate("[VU0] Unimplemented special1 macro operation {:#08b}\n", function);
 		}
 	}
 
@@ -43,8 +42,7 @@ namespace vu
 		case 0b0110101: op_vsqi(vu_instr); break;
 		case 0b0110001: op_vmr32(vu_instr); break;
 		default:
-			fmt::print("[VU0] Unimplemented special2 macro operation {:#09b}\n", opcode);
-			std::abort();
+			common::Emulator::terminate("[VU0] Unimplemented special2 macro operation {:#09b}\n", opcode);
 		}
 	}
 

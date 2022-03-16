@@ -68,8 +68,7 @@ namespace vu
 			data = status.value;
 			break;
 		default:
-			fmt::print("[VIF{}] Writing {:#x} to unknown register {}\n", id, data, VIF_REGS[offset]);
-			std::abort();
+			common::Emulator::terminate("[VIF{}] Writing {:#x} to unknown register {}\n", id, data, VIF_REGS[offset]);
 		}
 
 		fmt::print("[VIF{}] Reading {:#x} from {}\n", id, data, VIF_REGS[offset]);
@@ -101,8 +100,7 @@ namespace vu
 			status.mark = 0;
 			break;
 		default:
-			fmt::print("[VIF{}] Writing {:#x} to unknown register {}\n", id, data, VIF_REGS[offset]);
-			std::abort();
+			common::Emulator::terminate("[VIF{}] Writing {:#x} to unknown register {}\n", id, data, VIF_REGS[offset]);
 		}
 
 		fmt::print("[VIF{}] Writing {:#x} to {}\n", id, data, VIF_REGS[offset]);
@@ -173,8 +171,7 @@ namespace vu
 				process_unpack();
 				break;
 			default:
-				fmt::print("[VIF{}] Unkown VIF command {:#x}\n", id, (uint16_t)command.command);
-				std::abort();
+				common::Emulator::terminate("[VIF{}] Unkown VIF command {:#x}\n", id, (uint16_t)command.command);
 			}
 
 			fifo.pop<uint32_t>();
@@ -275,8 +272,7 @@ namespace vu
 			return;
 		}
 		default:
-			fmt::print("[VIF{}] Unknown UNPACK format {:#b}\n", id, format);
-			std::abort();
+			common::Emulator::terminate("[VIF{}] Unknown UNPACK format {:#b}\n", id, format);
 		}
 
 		/* TODO: Apply masking/mode settings */
@@ -296,7 +292,7 @@ namespace vu
 		else
 		{
 			/* NOP */
-			std::abort();
+			common::Emulator::terminate("\n");
 		}
 	}
 }

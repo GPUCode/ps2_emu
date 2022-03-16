@@ -22,8 +22,7 @@ inline uint32_t get_channel(uint32_t value)
 	case 0xd0: return 8;
 	case 0xd4: return 9;
 	default:
-		fmt::print("[DMAC] Invalid channel id provided {:#x}, aborting...\n", value);
-		std::abort();
+		common::Emulator::terminate("[DMAC] Invalid channel id provided {:#x}, aborting...\n", value);
 	}
 }
 

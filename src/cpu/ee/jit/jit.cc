@@ -17,11 +17,6 @@ namespace ee
             delete builder;
 		}
 
-        void JITCompiler::run()
-		{
-            entry(ee);
-		}
-
 		void JITCompiler::reset()
 		{
             code = new asmjit::CodeHolder;
@@ -30,19 +25,18 @@ namespace ee
             builder = new asmjit::x86::Assembler(code);
 																		
             /* Store the calle-saved registers */
-            emit_register_flush();
+            //emit_register_flush();
 
 			/* Emit block dispatcher */
-            emit_block_dispatcher();
+            //emit_block_dispatcher();
 
             /* Restore saved registers before exiting */
-            emit_register_restore();
+            //emit_register_restore();
 
-            if (auto error = runtime.add(&entry, code); error)
-			{
-				fmt::print("[JIT] Could not compile entry function!\n");
-				std::abort();
-			}
+            //if (auto error = runtime.add(&entry, code); error)
+            //{
+            //	common::Emulator::terminate("[JIT] Could not compile entry function!\n");
+            //}
 
             fmt::print("{}\n", logger.data());
 		}
@@ -63,6 +57,16 @@ namespace ee
                 builder->pop(reg);
         }
 
+        void test(EmotionEngine* ee)
+        {
+            if (ee->pc == 0x9fc42564)
+            {
+                fmt::print("fff");
+                fmt::print("fsd");
+                fmt::print("fsds");
+            }
+        }
+
         BlockFunc JITCompiler::emit_native(IRBlock& block)
         {
             BlockFunc handler = nullptr;
@@ -74,17 +78,39 @@ namespace ee
             code->setLogger(&logger);
             code->attach(builder);
 
-            asmjit::Label block_end = builder->newLabel();
+            auto block_end = builder->newLabel();
+            auto block_epilogue = builder->newLabel();
 
             /* Push new stack frame for our block */
             builder->push(asmjit::x86::rbp);
             builder->mov(asmjit::x86::rsp, asmjit::x86::rbp);
-            emit_register_flush();
             builder->sub(asmjit::x86::rsp, 0x1B8);
+            //emit_register_flush();
+            builder->push(asmjit::x86::rbx);
+
+            /* Set EE PC to the start of the block */
+            builder->mov(asmjit::x86::rbx, asmjit::x86::rdi);
+            auto pc_ptr = asmjit::x86::dword_ptr(asmjit::x86::rdi, offsetof(EmotionEngine, pc));
+            builder->mov(pc_ptr, block.pc);
 
             for (int i = 0; i < block.size(); i++)
             {
                 auto& instr = block[i];
+
+                /* If the instruction is a likely branch, the delay slot is skipped
+                 * in some cases. This is bad for us, because direct_jump in the interpreter
+                 * messes with the pc causing the detection logic below to fail. To deal
+                 * with this set the pc to the address of the delay slot so it gets
+                 * incremented to the correct place
+                 */
+                if (block[i].is_likely_branch)
+                {
+                    builder->mov(pc_ptr, instr.pc + 4);
+                }
+
+                //builder->call((uint64_t)test);
+                //builder->mov(asmjit::x86::rdi, asmjit::x86::rbx);
+
                 switch (instr.operation)
                 {
                 case IROperation::None:
@@ -92,23 +118,36 @@ namespace ee
                 default:
                     emit_fallback(instr);
                 }
+
+                /* When a branch likely instructions fails the delay slot is skipped! */
+                if (block[i].is_likely_branch)
+                {
+                    auto skip_ptr = asmjit::x86::dword_ptr(asmjit::x86::rdi, offsetof(EmotionEngine, skip_branch_delay));
+                    builder->cmp(skip_ptr, 1);
+                    builder->mov(skip_ptr, 0);
+                    builder->je(block_epilogue);
+                }
             }
 
-            builder->add(asmjit::x86::rsp, 0x1B8);
-            emit_register_restore();
+            builder->bind(block_epilogue);
 
             /* Decrement cycles counter in the EE */
             auto cycles_ptr = asmjit::x86::dword_ptr(asmjit::x86::rdi, offsetof(EmotionEngine, cycles_to_execute));
             builder->sub(cycles_ptr, block.total_cycles);
 
             /* Move the PC forward by the block size, ONLY if a jump didn't occur */
-            auto pc_ptr = asmjit::x86::dword_ptr(asmjit::x86::rdi, offsetof(EmotionEngine, pc));
             builder->cmp(pc_ptr, block.pc);
             builder->jne(block_end);
-            builder->mov(pc_ptr, block.pc + block.instructions.size() * 4);
+            builder->add(pc_ptr, block.instructions.size() * 4);
             builder->bind(block_end);
 
+            builder->mov(asmjit::x86::rdi, asmjit::x86::rbx);
+            builder->call(reinterpret_cast<uint64_t>(test));
+
             /* Clean up stack before exiting */
+            builder->pop(asmjit::x86::rbx);
+            //emit_register_restore();
+            builder->add(asmjit::x86::rsp, 0x1B8);
             builder->pop(asmjit::x86::rbp);
             builder->ret();
 
@@ -137,8 +176,11 @@ namespace ee
                                             offsetof(Instruction, value));
 
              builder->mov(instr_pc_ptr, instr.pc);
+             //builder->mov(pc_ptr, instr.pc);
              builder->mov(instr_value_ptr, instr.value);
+
              builder->call(reinterpret_cast<uint64_t>(instr.handler));
+             builder->mov(asmjit::x86::rdi, asmjit::x86::rbx);
 
              /* Sometimes an instruction might write to GPR[0].
                 To avoid branches, reset the register each time */
@@ -146,9 +188,15 @@ namespace ee
         }
 
         /* Look up the block cache for the block */
-        BlockFunc lookup_next_block(EmotionEngine* ee)
+        void lookup_next_block(EmotionEngine* ee)
 		{
             uint32_t pc = ee->pc;
+
+            if (pc == 2680431928)
+            {
+                fmt::print("ff");
+            }
+
             JITCompiler* compiler = ee->compiler;
             fmt::print("[JIT] Searching for block at PC: {:#x}\n", pc);
 
@@ -157,6 +205,7 @@ namespace ee
             {
                 /* Block not found, recompile it */
                 IRBlock ir_block = compiler->irbuilder.generate(pc);
+
                 block = compiler->emit_native(ir_block);
                 compiler->block_cache[pc] = block;
             }
@@ -165,12 +214,14 @@ namespace ee
                 block = result->second;
             }
 
-            return block;
+            block(ee);
         }
 
-        void print(int cycles)
+        void JITCompiler::run()
         {
-            fmt::print("Priting: {}\n", cycles);
+            //entry(ee);
+            while (ee->cycles_to_execute > 0)
+                lookup_next_block(ee);
         }
 
         /* This function is responsible for emitting a dispatcher
@@ -182,23 +233,21 @@ namespace ee
 
             /*  do
                 {
-                    BlockFunc block = lookup_next_block();
-                    block(jit->ee);
-                } while (jit->ee->cycles_to_execute > 0);
+                    BlockFunc block = lookup_next_block(ee);
+                    block(ee);
+                } while (ee->cycles_to_execute > 0);
             */
 
+            builder->push(asmjit::x86::rbx);
             builder->mov(asmjit::x86::rbx, asmjit::x86::rdi);
             builder->bind(loop_start);
             /* Call lookup_next_block */
             builder->mov(asmjit::x86::rdi, asmjit::x86::rbx);
             builder->call(reinterpret_cast<uint64_t>(lookup_next_block));
 
-            /* Call the block function and check cycles */
-            builder->mov(asmjit::x86::rdi, asmjit::x86::rbx);
-            builder->call(asmjit::x86::rax);
-
-            builder->cmp(asmjit::x86::dword_ptr(asmjit::x86::rbx, offsetof(EmotionEngine, cycles_to_execute)), 0);
-            builder->jg(loop_start);
+            builder->cmp(asmjit::x86::rax, 1);
+            builder->je(loop_start);
+            builder->pop(asmjit::x86::rbx);
             builder->ret();
         }
 	}

@@ -83,8 +83,7 @@ namespace media
             cmd != PadCommand::CONFIG_MODE &&
             cmd != PadCommand::READ_DATA)
         {
-            fmt::print("[PAD] This command needs to be called in config mode!\n");
-            std::abort(); /* For debugging */
+            common::Emulator::terminate("[PAD] This command needs to be called in config mode!\n");
             return 0xf3;
         }
 

@@ -9,7 +9,7 @@
 namespace ee
 {
     /* Nice interface for instructions */
-    struct __attribute__((packed)) Instruction
+    struct Instruction
     {
         union
         {
@@ -92,8 +92,6 @@ namespace ee
     /* A class implemeting the MIPS R5900 CPU. */
     struct EmotionEngine
     {
-        friend jit::BlockFunc lookup_next_block(EmotionEngine* ee);
-
         EmotionEngine(common::Emulator* parent);
         ~EmotionEngine();
 
@@ -110,50 +108,9 @@ namespace ee
         template <typename T>
         void write(uint32_t addr, T data);
 
-        /* Opcodes */
-        void op_cop0(); void op_mfc0(); void op_sw();
-        void op_special(); void op_sll(); void op_slti();
-        void op_bne(); void op_ori(); void op_addi();
-        void op_lq(); void op_lui(); void op_jr(); void op_addiu();
-        void op_tlbwi(); void op_mtc0(); void op_lw(); void op_mmi();
-        void op_madd1(); void op_jalr(); void op_sd(); void op_jal();
-        void op_sra(); void op_regimm(); void op_bgez(); void op_addu();
-        void op_daddu(); void op_andi(); void op_beq(); void op_or();
-        void op_mult(); void op_divu(); void op_beql(); void op_mflo();
-        void op_sltiu(); void op_bnel(); void op_sync(); void op_lb();
-        void op_swc1(); void op_lbu(); void op_ld(); void op_j();
-        void op_sb(); void op_div(); void op_mfhi(); void op_sltu();
-        void op_blez(); void op_subu(); void op_bgtz(); void op_movn();
-        void op_slt(); void op_and(); void op_srl(); void op_dsll32();
-        void op_dsra32(); void op_dsll(); void op_lhu(); void op_bltz();
-        void op_sh(); void op_madd(); void op_divu1(); void op_mflo1();
-        void op_dsrav(); void op_xori(); void op_mult1(); void op_movz();
-        void op_dsllv(); void op_daddiu(); void op_sq(); void op_lh();
-        void op_cache(); void op_sllv(); void op_srav(); void op_nor();
-        void op_lwu(); void op_ldl(); void op_ldr(); void op_sdl();
-        void op_sdr(); void op_dsrl(); void op_srlv(); void op_dsrl32();
-        void op_syscall(); void op_bltzl(); void op_bgezl(); void op_mfsa();
-        void op_mthi(); void op_mtlo(); void op_mtsa(); void op_lwc1();
-        void op_dsubu(); void op_blezl(); void op_xor(); void op_multu();
-        void op_lwl(); void op_lwr(); void op_swl(); void op_swr();
-        void op_sqc2(); void op_dsra(); void op_sub(); void op_add();
-
-        /* COP0 instructions */
-        void op_di(); void op_eret(); void op_ei();
-
-        /* COP1 instructions */
-        void op_cop1(); void op_mtc1(); void op_ctc1(); void op_cfc1();
-
-        /* COP2 instructions */
-        void op_cop2();
-
-        /* Parallel instructions */
-        void op_por(); void op_padduw();
-
-        /* MMI instructions */
-        void op_plzcw(); void op_mfhi1(); void op_mthi1(); void op_mtlo1();
-        void op_pcpyh(); void op_pcpyld(); void op_pnor(); void op_psubb();
-        void op_pand(); void op_pcpyud(); void op_pxor(); void op_psubw();
+    public:
+        /* Logging */
+        bool print_pc = true;
 
         /* Registers. */
         Register gpr[32] = {};
@@ -162,7 +119,7 @@ namespace ee
         uint32_t sa = 0;
         Instruction instr, next_instr;
         uint32_t exception_addr[2] = { 0x80000000, 0xBFC00200 };
-        bool skip_branch_delay = false;
+        uint32_t skip_branch_delay = 0;
 
         /* Used by the JIT for cycle counting */
         int cycles_to_execute = 0;
@@ -185,18 +142,18 @@ namespace ee
 
         /* EE JIT compiler */
         jit::JITCompiler* compiler;
-
-        /* Logging */
-        std::FILE* disassembly;
-        bool print_pc = true;
-
-    protected:
         common::Emulator* emulator;
     };
 
     template <typename T>
     T EmotionEngine::read(uint32_t addr)
     {
+        if (addr == 0x80006E04)
+        {
+            uint8_t value = ram[0x6E04];
+            fmt::print("{:d}", static_cast<uint32_t>(value));
+        }
+
         uint32_t paddr = addr & common::KUSEG_MASKS[addr >> 29];
         switch (paddr)
         {
@@ -278,6 +235,12 @@ namespace ee
             return;
         default:
             emulator->write<T, common::ComponentID::EE>(paddr, data);
+        }
+
+        if (*(uint32_t*)&ram[0x6E04] == 0xFFB10030)
+        {
+            fmt::print("");
+            common::Emulator::terminate("");
         }
     }
 };

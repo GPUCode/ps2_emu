@@ -20,6 +20,7 @@ set(SOURCES
     src/cpu/iop/iop.cc
     src/cpu/iop/dma.cc
     src/cpu/iop/timers.cc
+    src/cpu/ee/opcode.cc
     src/cpu/ee/intc.cc
     src/cpu/iop/intr.cc
     src/gs/gif.cc
@@ -42,6 +43,7 @@ set(SOURCES
 
 set(HEADERS
     src/common/emulator.h
+    src/cpu/ee/cop0.h
     src/cpu/ee/ee.h
     src/cpu/ee/timers.h
     src/cpu/ee/opcode.h

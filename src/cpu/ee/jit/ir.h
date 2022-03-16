@@ -60,13 +60,7 @@ namespace ee
             EnableInterrupts, DisableInterrupts
         };
 
-        using InterpreterFunc = void (EmotionEngine::*)();
-
-        template <InterpreterFunc Func>
-        void jit_callable(EmotionEngine* ee)
-        {
-            (ee->*Func)();
-        }
+        using InterpreterFunc = void (*)(EmotionEngine*);
 
         /* Instruction representation consumable from CodeGenerator */
 		struct IRInstruction
@@ -82,13 +76,14 @@ namespace ee
 
             /* Used for branch and conditional move instructions */
             BranchCond condition = BranchCond::None;
-            bool is_branch = false;
+            bool is_branch = false, is_likely_branch = false;
+            bool is_direct = false;
 
             /* Keep track of the cycles between instructions */
             uint32_t cycles_till_now, instruction_cycle_count;
 
             /* Interpreter fallback */
-            void (*handler)(EmotionEngine*);
+            void (*handler)(EmotionEngine*) = nullptr;
             uint32_t pc, value;
 		};
 
