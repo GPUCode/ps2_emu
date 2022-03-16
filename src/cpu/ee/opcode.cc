@@ -6,15 +6,18 @@
 /* Open disassembly file */
 std::ofstream disassembly = std::ofstream("disassembly_ee.log");
 
-#ifdef NDEBUG
+#ifndef NDEBUG
 #define log(...) (void)0
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;
 #define log(...) \
-    auto message = fmt::format(__VA_ARGS__); \
-    auto output = fmt::format("PC: {:#x} {}", ee->instr.pc, message); \
-    disassembly << output; \
-    disassembly.flush()
+    if (ee->print_pc) \
+    { \
+        auto message = fmt::format(__VA_ARGS__); \
+        auto output = fmt::format("PC: {:#x} {}", ee->instr.pc, message); \
+        disassembly << output; \
+        disassembly.flush(); \
+    }
 
 #endif
 
@@ -151,12 +154,6 @@ namespace ee
         uint32_t vaddr = offset + ee->gpr[base].word[0];
         uint32_t data = ee->gpr[rt].word[0];
 
-        if (ee->pc == 0xBFC00CB0)
-        {
-            fmt::print("");
-            fmt::print("f");
-        }
-
         log("SW: Writing ee->gpr[{:d}] ({:#x}) to address {:#x} = ee->gpr[{:d}] ({:#x}) + {:d}\n", rt, data, vaddr, base, ee->gpr[base].word[0], offset);
         if (vaddr & 0x3) [[unlikely]]
         {
@@ -203,14 +200,12 @@ namespace ee
         uint16_t rs = ee->instr.i_type.rs;
         int32_t imm = (int16_t)ee->instr.i_type.immediate;
 
-        if (ee->instr.pc == 0x9fc4255c)
-        {
-
-        }
-
         int32_t offset = imm << 2;
         if (ee->gpr[rs].dword[0] != ee->gpr[rt].dword[0])
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
 
         ee->next_instr.is_delay_slot = true;
         log("BNE: IF ee->gpr[{:d}] ({:#x}) != ee->gpr[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, ee->gpr[rt].dword[0], rs, ee->gpr[rs].dword[0], offset);
@@ -268,6 +263,7 @@ namespace ee
         ee->pc = ee->gpr[rs].word[0];
 
         ee->next_instr.is_delay_slot = true;
+        ee->branch_taken = true;
         log("JR: Jumped to ee->gpr[{:d}] = {:#x}\n", rs, ee->pc);
     }
 
@@ -300,8 +296,7 @@ namespace ee
         log("SWC1: Writing FPR[{:d}] ({:#x}) to address {:#x} = ee->gpr[{:d}] ({:#x}) + {:d}\n", ft, data, vaddr, base, ee->gpr[base].word[0], offset);
         if ((vaddr & 0b11) != 0) [[unlikely]]
         {
-            log("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
-            std::exit(1); /* NOTE: SignalException (AddressError) */
+            common::Emulator::terminate("[ERROR] SW: Address {:#x} is not aligned\n", vaddr);
         }
         else
             ee->write<uint32_t>(vaddr, data);
@@ -346,6 +341,7 @@ namespace ee
         ee->pc = ((ee->instr.pc + 4) & 0xF0000000) | (instr_index << 2);
 
         ee->next_instr.is_delay_slot = true;
+        ee->branch_taken = true;
         log("J: Jumping to PC = {:#x}\n", ee->pc);
     }
 
@@ -416,7 +412,10 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = ee->gpr[rs].dword[0];
         if (reg <= 0)
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
 
         ee->next_instr.is_delay_slot = true;
         log("BLEZ: IF ee->gpr[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, ee->gpr[rs].dword[0], offset);
@@ -443,7 +442,10 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = ee->gpr[rs].dword[0];
         if (reg > 0)
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
 
         ee->next_instr.is_delay_slot = true;
         log("BGTZ: IF ee->gpr[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, ee->gpr[rs].dword[0], offset);
@@ -513,7 +515,10 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = ee->gpr[rs].dword[0];
         if (reg < 0)
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
 
         ee->next_instr.is_delay_slot = true;
         log("BLTZ: IF ee->gpr[{:d}] ({:#x}) > 0 THEN PC += {:#x}\n", rs, ee->gpr[rs].dword[0], offset);
@@ -914,11 +919,14 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = ee->gpr[rs].dword[0];
         if (reg < 0)
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
         else
         {
-            ee->direct_jump();
-            ee->skip_branch_delay = 1;
+            ee->fetch_next();
+            ee->skip_branch_delay = true;
         }
 
         log("BLTZL: IF ee->gpr[{:d}] ({:#x}) < 0 THEN PC += {:#x}\n", rs, reg, offset);
@@ -933,11 +941,14 @@ namespace ee
         int64_t reg = ee->gpr[rs].dword[0];
 
         if (reg >= 0)
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
         else
         {
-            ee->direct_jump();
-            ee->skip_branch_delay = 1;
+            ee->fetch_next();
+            ee->skip_branch_delay = true;
         }
 
         log("BGEZL: IF ee->gpr[{:d}] ({:#x}) >= 0 THEN PC += {:#x}\n", rs, reg, offset);
@@ -1012,11 +1023,14 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = ee->gpr[rs].dword[0];
         if (reg <= 0)
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
         else
         {
-            ee->direct_jump();
-            ee->skip_branch_delay = 1;
+            ee->fetch_next();
+            ee->skip_branch_delay = true;
         }
 
         log("BLEZL: IF ee->gpr[{:d}] ({:#x}) <= 0 THEN PC += {:#x}\n", rs, ee->gpr[rs].dword[0], offset);
@@ -1208,7 +1222,8 @@ namespace ee
         }
 
         /* Skip branch delay slot */
-        ee->direct_jump();
+        ee->branch_taken = true;
+        ee->fetch_next();
 
         if (!done)
         {
@@ -1668,6 +1683,7 @@ namespace ee
         ee->gpr[rd].dword[0] = ee->instr.pc + 8;
 
         ee->next_instr.is_delay_slot = true;
+        ee->branch_taken = true;
         log("JALR: Jumping to PC = ee->gpr[{:d}] ({:#x}) with link address {:#x}\n", rs, ee->pc, ee->gpr[rd].dword[0]);
     }
 
@@ -1698,6 +1714,7 @@ namespace ee
         ee->pc = ((ee->instr.pc + 4) & 0xF0000000) | (instr_index << 2);
 
         ee->next_instr.is_delay_slot = true;
+        ee->branch_taken = true;
         log("JAL: Jumping to PC = {:#x} with return link address {:#x}\n", ee->pc, ee->gpr[31].dword[0]);
     }
 
@@ -1721,7 +1738,10 @@ namespace ee
         int32_t offset = imm << 2;
         int64_t reg = (int64_t)ee->gpr[rs].dword[0];
         if (reg >= 0)
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
 
         ee->next_instr.is_delay_slot = true;
         log("BGEZ: IF ee->gpr[{:d}] ({:#x}) >= 0 THEN PC += {:#x}\n", rs, reg, offset);
@@ -1771,7 +1791,10 @@ namespace ee
 
         int32_t offset = imm << 2;
         if (ee->gpr[rs].dword[0] == ee->gpr[rt].dword[0])
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
 
         ee->next_instr.is_delay_slot = true;
         log("BEQ: IF ee->gpr[{:d}] ({:#x}) == ee->gpr[{:d}] ({:#x}) THEN PC += {:#x}\n", rt, ee->gpr[rt].dword[0], rs, ee->gpr[rs].dword[0], offset);
@@ -1831,10 +1854,13 @@ namespace ee
 
         int32_t offset = imm << 2;
         if (ee->gpr[rs].dword[0] == ee->gpr[rt].dword[0])
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
         else
         {
-            ee->direct_jump();
+            ee->fetch_next();
             ee->skip_branch_delay = 1;
         }
 
@@ -1869,10 +1895,13 @@ namespace ee
 
         int32_t offset = imm << 2;
         if (ee->gpr[rs].dword[0] != ee->gpr[rt].dword[0])
+        {
             ee->pc = ee->instr.pc + 4 + offset;
+            ee->branch_taken = true;
+        }
         else
         {
-            ee->direct_jump();
+            ee->fetch_next();
             ee->skip_branch_delay = 1;
         }
 

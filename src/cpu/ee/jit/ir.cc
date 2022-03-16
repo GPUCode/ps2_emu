@@ -36,14 +36,6 @@ namespace ee
             bool branch_delay = false;
             do
             {
-                if (pc == 0x9fc4255c)
-                {
-                    for (int i = 0; i < 32; i++)
-                        fmt::print("GPR[{}] = {:#x}\n", i, ee->gpr[i].dword[0]);
-
-                    //common::Emulator::terminate("");
-                }
-
                 uint32_t value = ee->read<uint32_t>(pc);
                 pc += 4;
 
@@ -337,8 +329,39 @@ namespace ee
                 }
                 break;
             }
-            //case COP1_OPCODE: op_cop1(); break;
-            //case 0b010010: op_cop2(); break;
+            case COP1_OPCODE:
+            {
+                uint32_t fmt = (instr.value >> 21) & 0x1f;
+                switch (fmt)
+                {
+                //case 0b00100: op_mtc1(ee); break;
+                //case 0b00110: op_ctc1(ee); break;
+                //case 0b00010: op_cfc1(ee); break;
+                //case 0b10000: ee->cop1.execute(ee->instr); break;
+                default:
+                    //common::Emulator::terminate("[ERROR] Unimplemented COP1 instruction {:#07b}\n", fmt);
+                    ir_instr.operation = IROperation::None;
+                    break;
+                }
+                break;
+            }
+            case 0b010010:
+            {
+                uint32_t fmt = (instr.value >> 21) & 0x1f;
+                switch (fmt)
+                {
+                case 0b00010:
+                case 0b00110:
+                case 0b00001:
+                case 0b00101:
+                case 0b10000 ... 0b11111:
+                    ir_instr.operation = IROperation::None;
+                    break;
+                default:
+                    common::Emulator::terminate("[ERROR] Unimplemented COP2 instruction {:#07b}\n", fmt);
+                }
+                break;
+            }
             case 0b011100:
             {
                 uint16_t type = instr.r_type.funct;

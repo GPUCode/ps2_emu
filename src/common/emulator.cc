@@ -155,7 +155,8 @@ namespace common
             }
             
             ee->pc = header.e_entry;
-            ee->direct_jump();
+            ee->fetch_next();
+            ee->print_pc = true;
 
             return true;
         }

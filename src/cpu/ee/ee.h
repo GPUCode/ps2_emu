@@ -99,7 +99,7 @@ namespace ee
         void reset();
         void tick(uint32_t cycles);
         void exception(Exception exception, bool log = true);
-        void direct_jump();
+        void fetch_next();
 
         /* Memory operations */
         template <typename T>
@@ -110,7 +110,7 @@ namespace ee
 
     public:
         /* Logging */
-        bool print_pc = true;
+        bool print_pc = false;
 
         /* Registers. */
         Register gpr[32] = {};
@@ -119,7 +119,7 @@ namespace ee
         uint32_t sa = 0;
         Instruction instr, next_instr;
         uint32_t exception_addr[2] = { 0x80000000, 0xBFC00200 };
-        uint32_t skip_branch_delay = 0;
+        bool skip_branch_delay = 0, branch_taken = false;
 
         /* Used by the JIT for cycle counting */
         int cycles_to_execute = 0;
@@ -148,12 +148,6 @@ namespace ee
     template <typename T>
     T EmotionEngine::read(uint32_t addr)
     {
-        if (addr == 0x80006E04)
-        {
-            uint8_t value = ram[0x6E04];
-            fmt::print("{:d}", static_cast<uint32_t>(value));
-        }
-
         uint32_t paddr = addr & common::KUSEG_MASKS[addr >> 29];
         switch (paddr)
         {
@@ -235,12 +229,6 @@ namespace ee
             return;
         default:
             emulator->write<T, common::ComponentID::EE>(paddr, data);
-        }
-
-        if (*(uint32_t*)&ram[0x6E04] == 0xFFB10030)
-        {
-            fmt::print("");
-            common::Emulator::terminate("");
         }
     }
 };

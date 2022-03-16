@@ -80,13 +80,13 @@ namespace ee
 
             auto block_end = builder->newLabel();
             auto block_epilogue = builder->newLabel();
+            auto dec_pc = builder->newLabel();
 
             /* Push new stack frame for our block */
             builder->push(asmjit::x86::rbp);
             builder->mov(asmjit::x86::rsp, asmjit::x86::rbp);
             builder->sub(asmjit::x86::rsp, 0x1B8);
-            //emit_register_flush();
-            builder->push(asmjit::x86::rbx);
+            emit_register_flush();
 
             /* Set EE PC to the start of the block */
             builder->mov(asmjit::x86::rbx, asmjit::x86::rdi);
@@ -96,21 +96,6 @@ namespace ee
             for (int i = 0; i < block.size(); i++)
             {
                 auto& instr = block[i];
-
-                /* If the instruction is a likely branch, the delay slot is skipped
-                 * in some cases. This is bad for us, because direct_jump in the interpreter
-                 * messes with the pc causing the detection logic below to fail. To deal
-                 * with this set the pc to the address of the delay slot so it gets
-                 * incremented to the correct place
-                 */
-                if (block[i].is_likely_branch)
-                {
-                    builder->mov(pc_ptr, instr.pc + 4);
-                }
-
-                //builder->call((uint64_t)test);
-                //builder->mov(asmjit::x86::rdi, asmjit::x86::rbx);
-
                 switch (instr.operation)
                 {
                 case IROperation::None:
@@ -119,13 +104,24 @@ namespace ee
                     emit_fallback(instr);
                 }
 
-                /* When a branch likely instructions fails the delay slot is skipped! */
-                if (block[i].is_likely_branch)
+                /* Normally in the interpreter the pc is always 2 instructions ahead of the
+                 * one currently being executed, assuming no branches. This causes problems
+                 * in thecJIT if the instruction uses fetch_next() to direct jump, as that
+                 * increments the pc, causing the JIT to skip the first instruction of the branch.
+                 */
+                if (block[i].operation == IROperation::ExceptionReturn ||
+                    block[i].operation == IROperation::Syscall)
                 {
-                    auto skip_ptr = asmjit::x86::dword_ptr(asmjit::x86::rdi, offsetof(EmotionEngine, skip_branch_delay));
+                    builder->sub(pc_ptr, 4);
+                }
+
+                /* When a branch likely instructions fails the delay slot is skipped! */
+                if (block[i].operation == IROperation::BranchLikely)
+                {
+                    auto skip_ptr = asmjit::x86::byte_ptr(asmjit::x86::rdi, offsetof(EmotionEngine, skip_branch_delay));
                     builder->cmp(skip_ptr, 1);
                     builder->mov(skip_ptr, 0);
-                    builder->je(block_epilogue);
+                    builder->je(dec_pc);
                 }
             }
 
@@ -136,20 +132,22 @@ namespace ee
             builder->sub(cycles_ptr, block.total_cycles);
 
             /* Move the PC forward by the block size, ONLY if a jump didn't occur */
-            builder->cmp(pc_ptr, block.pc);
-            builder->jne(block_end);
-            builder->add(pc_ptr, block.instructions.size() * 4);
+            auto taken_ptr = asmjit::x86::byte_ptr(asmjit::x86::rdi, offsetof(EmotionEngine, branch_taken));
+            builder->cmp(taken_ptr, 1);
+            builder->mov(taken_ptr, 0);
+            builder->je(block_end);
+            builder->mov(pc_ptr, block.pc + block.instructions.size() * 4);
             builder->bind(block_end);
 
-            builder->mov(asmjit::x86::rdi, asmjit::x86::rbx);
-            builder->call(reinterpret_cast<uint64_t>(test));
-
             /* Clean up stack before exiting */
-            builder->pop(asmjit::x86::rbx);
-            //emit_register_restore();
+            emit_register_restore();
             builder->add(asmjit::x86::rsp, 0x1B8);
             builder->pop(asmjit::x86::rbp);
             builder->ret();
+
+            builder->bind(dec_pc);
+            builder->sub(pc_ptr, 4);
+            builder->jmp(block_epilogue);
 
             /* Build! */
             if (auto error = runtime.add(&handler, code); error)
@@ -157,7 +155,7 @@ namespace ee
                 common::Emulator::terminate("[JIT] Could not compile block at PC: {:#x}\n", block.pc);
             }
 
-            fmt::print("{}\n", logger.data());
+            //fmt::print("{}\n", logger.data());
 
             return handler;
         }
@@ -192,13 +190,8 @@ namespace ee
 		{
             uint32_t pc = ee->pc;
 
-            if (pc == 2680431928)
-            {
-                fmt::print("ff");
-            }
-
             JITCompiler* compiler = ee->compiler;
-            fmt::print("[JIT] Searching for block at PC: {:#x}\n", pc);
+            //fmt::print("[JIT] Searching for block at PC: {:#x}\n", pc);
 
             BlockFunc block = nullptr;
             if (auto result = compiler->block_cache.find(pc); result == compiler->block_cache.end())

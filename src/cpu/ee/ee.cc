@@ -57,9 +57,11 @@ namespace ee
         /*for (int cycle = cycles; cycle > 0; cycle--)
         {
             instr = next_instr;
-            skip_branch_delay = false;
 
-            direct_jump();
+            fetch_next();
+
+            skip_branch_delay = false;
+            branch_taken = false;
 
             switch (instr.opcode)
             {
@@ -114,11 +116,6 @@ namespace ee
             case 0b111110: op_sqc2(this); break;
             default:
                 common::Emulator::terminate("[ERROR] Unimplemented opcode: {:#06b}\n", instr.opcode & 0x3F);
-            }
-
-            if (gpr[3].word[0] == 0x746a0)
-            {
-                fmt::print("");
             }
 
             gpr[0].qword = 0;
@@ -176,10 +173,10 @@ namespace ee
         pc = exception_addr[cop0.status.bev] + vector;
 
         /* Insert the instruction in our pipeline */
-        direct_jump();
+        fetch_next();
     }
 
-    void EmotionEngine::direct_jump()
+    void EmotionEngine::fetch_next()
     {
         next_instr = {};
         next_instr.value = read<uint32_t>(pc);
