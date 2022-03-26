@@ -1,6 +1,8 @@
 #include <gs/gs.h>
 #include <common/emulator.h>
 #include <gs/gsrenderer.h>
+#include <gs/vulkan/window.h>
+#include <gs/vulkan/context.h>
 #include <cassert>
 #include <unordered_map>
 #include <glad/glad.h>
@@ -63,8 +65,8 @@ std::unordered_map<int, const char*> REGS =
 
 namespace gs
 {
-	GraphicsSynthesizer::GraphicsSynthesizer(common::Emulator* parent) :
-		emulator(parent)
+    GraphicsSynthesizer::GraphicsSynthesizer(common::Emulator* parent, VkWindow* window) :
+        emulator(parent), renderer(window)
 	{
 		uint32_t addresses[3] = { 0x12000000, 0x12000080, 0x12001000 };
 		auto reader = &GraphicsSynthesizer::read_priv;
@@ -216,26 +218,21 @@ namespace gs
 			break;
 		case 0x47:
 		case 0x48:
+        {
 			test[context] = data;
 			
-			/* Flush renderer */
-			renderer.render();
-			switch ((test[context] >> 17) & 0x3)
-			{
-			case 0:
-				glDepthFunc(GL_NEVER);
-				break;
-			case 1:
-				glDepthFunc(GL_GEQUAL);
-				break;
-			case 3:
-				glDepthFunc(GL_GREATER);
-				break;
-			default:
-                common::Emulator::terminate("[GS] Unknown depth function selected!\n");
-			}
+            // Flush renderer
+            auto& command_buffer = renderer.window->context->get_command_buffer();
+            vk::DeviceSize offsets[1] = { 0 };
 
+            command_buffer.bindVertexBuffers(0, 1, &renderer.buffer->local_buffer, offsets);
+            command_buffer.draw(renderer.vertex_count, 1, renderer.draw_data.size() - renderer.vertex_count, 0);
+            renderer.vertex_count = 0;
+
+            uint32_t new_depth = (test[context] >> 17) & 0x3;
+            renderer.set_depth_function(new_depth);
 			break;
+        }
 		case 0x49:
 			pabe = data;
 			break;
@@ -352,36 +349,31 @@ namespace gs
     void GraphicsSynthesizer::submit_vertex_fog(XYZF xyzf, bool draw_kick)
     {
         GSVertex vertex;
-        vertex.x = xyzf.x;
-        vertex.y = xyzf.y;
-        vertex.z = xyzf.z;
+        vertex.position = glm::vec3(xyzf.x, xyzf.y, xyzf.z);
         process_vertex(vertex, draw_kick);
     }
 
     void GraphicsSynthesizer::submit_vertex(XYZ xyz, bool draw_kick)
     {
         GSVertex vertex;
-        vertex.x = xyz.x;
-        vertex.y = xyz.y;
-        vertex.z = xyz.z;
+        vertex.position = glm::vec3(xyz.x, xyz.y, xyz.z);
         process_vertex(vertex, draw_kick);
     }
 
     void GraphicsSynthesizer::process_vertex(GSVertex vertex, bool draw_kick)
 	{
 		/* Convert the primitive coords to window coords */
-		vertex.x = (vertex.x - xyoffset[0].x_offset) / 16.0f;
-		vertex.y = (vertex.y - xyoffset[0].y_offset) / 16.0f;
+        auto& pos = vertex.position;
+        pos.x = (pos.x - xyoffset[0].x_offset) / 16.0f;
+        pos.y = (pos.y - xyoffset[0].y_offset) / 16.0f;
 
 		/* Convert to OpenGL coords */
-		vertex.x = (vertex.x / 320.0f) - 1.0f;
-		vertex.y = 1.0f - (vertex.y / 112.0f);
-        vertex.z = vertex.z / static_cast<float>(INT_MAX);
+        pos.x = (pos.x / 320.0f) - 1.0f;
+        pos.y = 1.0f - (pos.y / 112.0f);
+        pos.z = pos.z / static_cast<float>(INT_MAX);
 		
 		/* Set color information */
-		vertex.r = rgbaq.r / 255.0f;
-		vertex.g = rgbaq.g / 255.0f;
-		vertex.b = rgbaq.b / 255.0f;
+        vertex.color = glm::vec3(rgbaq.r, rgbaq.g, rgbaq.b) / 255.0f;
 
 		if (!vqueue.push(vertex))
 		{

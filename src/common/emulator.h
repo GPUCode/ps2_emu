@@ -42,6 +42,8 @@ namespace spu
     struct SPU;
 }
 
+class VkWindow;
+
 namespace common
 {
     constexpr uint32_t KUSEG_MASKS[8] = 
@@ -75,7 +77,7 @@ namespace common
     class Emulator
     {
     public:
-        Emulator();
+        Emulator(VkWindow* window);
         ~Emulator();
 
         void tick();

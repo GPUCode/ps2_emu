@@ -2,55 +2,31 @@
 #include <GLFW/glfw3.h>
 #include <common/emulator.h>
 #include <stdexcept>
+#include <gs/vulkan/window.h>
+#include <gs/vulkan/context.h>
+#include <gs/vulkan/buffer.h>
 
 int main()
 {
-    glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-    GLFWwindow* window = glfwCreateWindow(800, 600, "PS2 Emulator", NULL, NULL);
-    if (window == NULL)
-    {
-        glfwTerminate();
-        return -1;
-    }
-
-    glfwMakeContextCurrent(window);
-    glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int width, int height)
-    {
-        glViewport(0, 0, width, height);
-    });
-
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-        return -1;
-
-    common::Emulator* emulator = new common::Emulator;
+    VkWindow window(800, 600, "PS2");
+    common::Emulator* emulator = new common::Emulator(&window);
 
     try
     {
-        while (!glfwWindowShouldClose(window))
+        while (!window.should_close())
         {
-            if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-                glfwSetWindowShouldClose(window, true);
-
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-            glClearDepth(0.0);
-            glClear(GL_DEPTH_BUFFER_BIT);
-
-            /* Move the emulation one frame forward */
+            window.begin_frame();
             emulator->tick();
-
-            glfwSwapBuffers(window);
-            glfwPollEvents();
+            window.end_frame();
         }
+
     }
     catch (std::exception& e)
     {
         fmt::print("{}\n", e.what());
     }
 
+    window.destroy();
     delete emulator;
     return 0;
 }

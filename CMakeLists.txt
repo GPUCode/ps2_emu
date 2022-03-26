@@ -37,6 +37,9 @@ set(SOURCES
     src/media/gamepad.cc
     src/gs/gsvram.cc
     src/gs/gsrenderer.cpp
+    src/gs/vulkan/context.cc
+    src/gs/vulkan/window.cc
+    src/gs/vulkan/buffer.cc
     src/cpu/ee/jit/jit.cc
     src/cpu/ee/jit/ir.cc
 )
@@ -66,18 +69,62 @@ set(HEADERS
     src/media/gamepad.h
     src/gs/gsvram.h
     src/gs/gsrenderer.h
+    src/gs/vulkan/context.h
+    src/gs/vulkan/window.h
+    src/gs/vulkan/buffer.h
     src/cpu/ee/jit/jit.h
     src/cpu/ee/jit/ir.h
 )
 
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+set(SHADERS
+    src/shaders/vertex.glsl
+    src/shaders/fragment.glsl
+)
+
+add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS} ${SHADERS})
 
 # Asmjit
 set(ASMJIT_STATIC TRUE)
 add_subdirectory(${ASMJIT_DIR})
 target_link_libraries(${PROJECT_NAME} asmjit::asmjit)
 
+# Vulkan
+function(add_shader TARGET SHADER STAGE)
+    find_program(GLSLC glslc)
+
+    set(current-shader-path ${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${SHADER})
+    set(current-output-path ${CMAKE_BINARY_DIR}/bin/shaders/${SHADER}.spv)
+
+    # Add a custom command to compile GLSL to SPIR-V.
+    get_filename_component(current-output-dir ${current-output-path} DIRECTORY)
+    file(MAKE_DIRECTORY ${current-output-dir})
+
+    add_custom_command(
+           OUTPUT ${current-output-path}
+           COMMAND ${GLSLC} -o ${current-output-path} -fshader-stage=${STAGE} --target-env=vulkan1.1 ${current-shader-path}
+           DEPENDS ${current-shader-path}
+           IMPLICIT_DEPENDS CXX ${current-shader-path}
+           VERBATIM)
+
+    # Make sure our build depends on this output.
+    set_source_files_properties(${current-output-path} PROPERTIES GENERATED TRUE)
+    target_sources(${TARGET} PRIVATE ${current-output-path})
+endfunction(add_shader)
+
+# Find the VulkanSDK
+find_package(Vulkan REQUIRED)
+
+if(NOT Vulkan_FOUND)
+                # CMake may fail to locate the libraries but could be able to
+                # provide some path in Vulkan SDK include directory variable
+                # 'Vulkan_INCLUDE_DIRS', try to extract path from this.
+                message(STATUS "Failed to locate Vulkan SDK, retrying again...")
+endif()
+
+add_shader(${PROJECT_NAME} vertex.glsl vertex)
+add_shader(${PROJECT_NAME} fragment.glsl fragment)
+
 # Link to all the required conan libs
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(${PROJECT_NAME} ${CONAN_LIBS})
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src ${Vulkan_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} ${CONAN_LIBS} ${Vulkan_LIBRARIES} ${SHADERC_LIB})

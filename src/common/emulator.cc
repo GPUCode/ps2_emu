@@ -19,7 +19,7 @@ int cycles_executed = 0;
 
 namespace common
 {
-    Emulator::Emulator()
+    Emulator::Emulator(VkWindow* window)
     {
         /* Allocate the entire 32MB of RAM */
         bios = new uint8_t[4 * 1024 * 1024];
@@ -33,7 +33,7 @@ namespace common
         iop = std::make_unique<iop::IOProcessor>(this);
         iop_dma = std::make_unique<iop::DMAController>(this);
         gif = std::make_unique<gs::GIF>(this);
-        gs = std::make_unique<gs::GraphicsSynthesizer>(this);
+        gs = std::make_unique<gs::GraphicsSynthesizer>(this, window);
         dmac = std::make_unique<ee::DMAController>(this);
         vu[0] = std::make_unique<vu::VectorUnit>(ee.get());
         vu[1] = std::make_unique<vu::VectorUnit>(ee.get());

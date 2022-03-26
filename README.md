@@ -12,7 +12,7 @@ This project does not aim to replace existing PS2 emulators like PCSX2 and Dobie
 * JIT compilation support for the EE
 * Partial GS implementation with 32bit and 16bit texture swizzling.
 * Working DMAC/GIF/VIF transfers.
-* Hardware based OpenGL renderer
+* Hardware based Vulkan renderer
 * CMake build system and cross platform support
 
 

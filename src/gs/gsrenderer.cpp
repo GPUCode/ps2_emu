@@ -1,120 +1,107 @@
 #include <gs/gsrenderer.h>
-#include <glad/glad.h>
 #include <common/emulator.h>
+#include <gs/vulkan/context.h>
+#include <gs/vulkan/window.h>
 
-const char* vertexShaderSource = R"(
-#version 330 core
-layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aColor;
-
-out vec3 ourColor; // output a color to the fragment shader
-
-void main()
-{
-    gl_Position = vec4(aPos, 1.0);
-    ourColor = aColor; // set ourColor to the input color we got from the vertex data
-}
-)";
-
-const char* fragmentShaderSource = R"(
-#version 330 core
-out vec4 FragColor;
-in vec3 ourColor;
-
-void main()
-{
-   FragColor = vec4(ourColor, 1.0);
-}
-)";
+constexpr uint32_t MAX_VERTICES = 1024 * 1024;
 
 namespace gs
 {
-	GSRenderer::GSRenderer()
+    GSRenderer::GSRenderer(VkWindow* window) :
+        window(window)
 	{
-        int success;
-        char infoLog[512];
+        auto context = window->create_context();
 
-        /* Compile vertex and fragment shaders */
-        uint32_t vertex = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertex, 1, &vertexShaderSource, NULL);
-        glCompileShader(vertex);
+        // Create vulkan graphics pipeline
+        auto vertex = context->create_shader_module("shaders/vertex.glsl.spv");
+        vertex.stage = vk::ShaderStageFlagBits::eVertex;
 
-        glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            glGetShaderInfoLog(vertex, 512, NULL, infoLog);
-            common::Emulator::terminate("[GS][OpenGL] Vertex shader compilation failed\n");
-        }
+        auto fragment = context->create_shader_module("shaders/fragment.glsl.spv");
+        fragment.stage = vk::ShaderStageFlagBits::eFragment;
 
-        uint32_t fragment = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragment, 1, &fragmentShaderSource, NULL);
-        glCompileShader(fragment);
-        glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            glGetShaderInfoLog(fragment, 512, NULL, infoLog);
-            common::Emulator::terminate("[GS][OpenGL] Fragment shader compilation failed\n");
-        }
-        
-        /* Link shaders */
-        uint32_t program = glCreateProgram();
-        glAttachShader(program, vertex);
-        glAttachShader(program, fragment);
-        glLinkProgram(program);
-        glGetProgramiv(program, GL_LINK_STATUS, &success);
-        if (!success) 
-        {
-            glGetProgramInfoLog(program, 512, NULL, infoLog);
-            common::Emulator::terminate("[GS][OpenGL] Shader linking failed\n");
-        }
+        context->create_graphics_pipeline(vertex, fragment);
 
-        /* Delete unused objects */
-        glDeleteShader(vertex);
-        glDeleteShader(fragment);
-        glUseProgram(program);
-
-        /* Configure our VBO and VAO */
-        glGenVertexArrays(1, &vao);
-        glGenBuffers(1, &vbo);
-        
-        glBindVertexArray(vao);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-        glBufferData(GL_ARRAY_BUFFER, sizeof(GSVertex) * 1024 * 512, nullptr, GL_DYNAMIC_DRAW);
-
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(GSVertex), (void*)0);
-        glEnableVertexAttribArray(0);
-
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(GSVertex), (void*)(3 * sizeof(float)));
-        glEnableVertexAttribArray(1);
-
-        /* Enable depth testing */
-        glEnable(GL_DEPTH_TEST);
+        buffer = std::make_unique<Buffer>(context, MAX_VERTICES);
 	}
     
+    GSRenderer::~GSRenderer()
+    {
+        // Manually destroy used vulkan resources
+        buffer->destroy();
+    }
+
+    void GSRenderer::set_depth_function(uint32_t test_bits)
+    {
+        auto& context = window->context;
+        //auto& device = context->device;
+        //auto& queue = context->graphics_queue;
+
+        // Create an one-time submit command buffer
+        //vk::CommandBufferAllocateInfo alloc_info(context->command_pool, vk::CommandBufferLevel::ePrimary, 1);
+        //vk::CommandBuffer command_buffer = device->allocateCommandBuffers(alloc_info)[0];
+        //command_buffer.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+
+        // Set depth function
+        auto& command_buffer = context->get_command_buffer();
+        switch (test_bits)
+        {
+        case 0:
+            command_buffer.setDepthCompareOp(vk::CompareOp::eNever);
+            break;
+        case 1:
+            command_buffer.setDepthCompareOp(vk::CompareOp::eGreaterOrEqual);
+            break;
+        case 3:
+            command_buffer.setDepthCompareOp(vk::CompareOp::eGreater);
+            break;
+        default:
+            common::Emulator::terminate("[GS] Unknown depth function selected!\n");
+        }
+
+        //command_buffer.end();
+
+        //vk::SubmitInfo submit_info({}, {}, {}, 1, &command_buffer);
+        //queue.submit(submit_info, nullptr);
+        //queue.waitIdle();
+
+        //device->freeCommandBuffers(context->command_pool, command_buffer);
+
+    }
+
     void GSRenderer::render()
     {
-        /* Add data to the VBO */
-        glBufferSubData(GL_ARRAY_BUFFER, 0, draw_data.size() * sizeof(GSVertex), draw_data.data());
+        // Update vertex buffer
+        if (!draw_data.empty())
+        {
+            // Flush renderer
+            auto& command_buffer = window->context->get_command_buffer();
+            vk::DeviceSize offsets[1] = { 0 };
 
-        /* Draw vertices */
-        glDrawArrays(GL_TRIANGLES, 0, draw_data.size());
-        
-        draw_data.clear();
+            command_buffer.bindVertexBuffers(0, 1, &buffer->local_buffer, offsets);
+            command_buffer.draw(vertex_count, 1, draw_data.size() - vertex_count, 0);
+            vertex_count = 0;
+
+            // Copy the vertices to the GPU
+            buffer->copy_vertices(draw_data);
+            draw_data.clear();
+        }
     }
     
     void GSRenderer::submit_vertex(GSVertex v1)
     {
         draw_data.push_back(v1);
+        vertex_count++;
     }
 
     void GSRenderer::submit_sprite(GSVertex v1, GSVertex v2)
     {
-        draw_data.push_back({ .x = v2.x, .y = v1.y });
-        draw_data.push_back({ .x = v2.x, .y = v2.y });
-        draw_data.push_back({ .x = v1.x, .y = v1.y });
-        draw_data.push_back({ .x = v2.x, .y = v2.y });
-        draw_data.push_back({ .x = v1.x, .y = v2.y });
-        draw_data.push_back({ .x = v1.x, .y = v1.y });
+        draw_data.emplace_back(glm::vec3(v2.position.x, v1.position.y, 0));
+        draw_data.emplace_back(glm::vec3(v2.position.x, v2.position.y, 0));
+        draw_data.emplace_back(glm::vec3(v1.position.x, v1.position.y, 0));
+        draw_data.emplace_back(glm::vec3(v2.position.x, v2.position.y, 0));
+        draw_data.emplace_back(glm::vec3(v1.position.x, v2.position.y, 0));
+        draw_data.emplace_back(glm::vec3(v1.position.x, v1.position.y, 0));
+
+        vertex_count += 6;
     }
 }

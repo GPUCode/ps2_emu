@@ -1,6 +1,11 @@
 #pragma once
+#include <gs/vulkan/buffer.h>
 #include <cstdint>
+#include <memory>
 #include <vector>
+
+class VkWindow;
+class Buffer;
 
 namespace gs
 {
@@ -15,25 +20,25 @@ namespace gs
 		Sprite = 6
 	};
 
-	struct GSVertex
-	{
-		float x, y, z = 0;
-		float r = 0.0f, g = 0.0f, b = 0.0f;
-	};
+    using GSVertex = Vertex;
 
 	/* The main renderer responsible for drawing the fancy
 	   graphics to the screen. */
 	struct GSRenderer
 	{
-		GSRenderer();
+        GSRenderer(VkWindow* window);
+        ~GSRenderer();
 
 		void render();
+        void set_depth_function(uint32_t test_bits);
 
 		void submit_vertex(GSVertex v1);
 		void submit_sprite(GSVertex v1, GSVertex v2);
 
-	private:
-		uint32_t vbo, vao;
+    public:
+        VkWindow* window = nullptr;
 		std::vector<GSVertex> draw_data;
+        std::unique_ptr<Buffer> buffer;
+        int vertex_count = 0;
 	};
 }

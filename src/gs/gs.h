@@ -164,7 +164,7 @@ namespace gs
 	struct GraphicsSynthesizer : public common::Component
 	{
 		friend struct GIF;
-		GraphicsSynthesizer(common::Emulator* parent);
+        GraphicsSynthesizer(common::Emulator* parent, VkWindow* window);
 		~GraphicsSynthesizer();
 
 		/* Used by the EE */
