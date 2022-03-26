@@ -6,7 +6,7 @@
 /* Open disassembly file */
 std::ofstream disassembly = std::ofstream("disassembly_ee.log");
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 #define log(...) (void)0
 #else
 constexpr fmt::v8::text_style BOLD = fg(fmt::color::forest_green) | fmt::emphasis::bold;

@@ -14,7 +14,7 @@ namespace ee
 
 		struct JITCompiler
 		{
-            friend void lookup_next_block(EmotionEngine* compiler);
+            friend BlockFunc lookup_next_block(EmotionEngine* compiler);
 
 			JITCompiler(EmotionEngine* parent);
 			~JITCompiler();
