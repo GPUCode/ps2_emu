@@ -71,7 +71,6 @@ void Buffer::copy_buffer(vk::Buffer src_buffer, vk::Buffer dst_buffer, vk::Devic
 
     vk::BufferCopy copy_region(0, 0, size);
     command_buffer.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-    //auto& command_buffer = context->get_command_buffer();
     command_buffer.copyBuffer(src_buffer, dst_buffer, copy_region);
     command_buffer.end();
 

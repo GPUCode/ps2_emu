@@ -11,21 +11,24 @@ class VkContext;
 struct VertexInfo
 {
     VertexInfo() = default;
-    VertexInfo(glm::vec3 position, glm::vec3 color) : position(position), color(color) {};
+    VertexInfo(glm::vec3 position, glm::vec3 color, glm::vec2 coords) :
+        position(position), color(color), texcoords(coords) {};
 
     glm::vec3 position;
     glm::vec3 color;
+    glm::vec2 texcoords;
 };
 
 struct Vertex : public VertexInfo
 {
     Vertex() = default;
-    Vertex(glm::vec3 position, glm::vec3 color = {}) : VertexInfo(position, color) {};
+    Vertex(glm::vec3 position, glm::vec3 color = {}, glm::vec2 coords = {}) : VertexInfo(position, color, coords) {};
     static constexpr auto binding_desc = vk::VertexInputBindingDescription(0, sizeof(VertexInfo));
-    static constexpr std::array<vk::VertexInputAttributeDescription, 2> attribute_desc =
+    static constexpr std::array<vk::VertexInputAttributeDescription, 3> attribute_desc =
     {
           vk::VertexInputAttributeDescription(0, 0, vk::Format::eR32G32B32Sfloat, offsetof(VertexInfo, position)),
           vk::VertexInputAttributeDescription(1, 0, vk::Format::eR32G32B32Sfloat, offsetof(VertexInfo, color)),
+          vk::VertexInputAttributeDescription(2, 0, vk::Format::eR32G32Sfloat, offsetof(VertexInfo, texcoords)),
     };
 };
 

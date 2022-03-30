@@ -242,7 +242,7 @@ namespace gs
 			break;
 		case 0x4c:
 		case 0x4d:
-			frame[context] = data;
+            frame[context].value = data;
 			break;
 		case 0x4e:
 		case 0x4f:
@@ -338,8 +338,16 @@ namespace gs
 		/* Check if transfer has completed */
 		if (data_written >= trxreg.width * trxreg.height)
 		{
+            // Reset counters
 			fmt::print("[GS] HWREG transfer complete!\n");
 			data_written = 0;
+
+            // Copy texture data to the GPU
+            auto ptr = reinterpret_cast<uint8_t*>(&vram[frame[0].base_ptr * 32]);
+            std::vector<uint8_t> pixels(640 * 368 * 4);
+
+            pixels.assign(ptr, ptr + pixels.size());
+            renderer.vram->copy_pixels(pixels);
 
 			/* Deactivate TRXDIR */
 			trxdir = TRXDir::None;

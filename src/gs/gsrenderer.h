@@ -1,5 +1,6 @@
 #pragma once
 #include <gs/vulkan/buffer.h>
+#include <gs/vulkan/texture.h>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -39,6 +40,7 @@ namespace gs
         VkWindow* window = nullptr;
 		std::vector<GSVertex> draw_data;
         std::unique_ptr<Buffer> buffer;
+        std::unique_ptr<VkTexture> vram;
         int vertex_count = 0;
 	};
 }

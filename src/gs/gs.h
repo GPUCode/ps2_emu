@@ -161,6 +161,21 @@ namespace gs
 		None = 3
 	};
 
+    union FRAME
+    {
+        uint64_t value;
+        struct
+        {
+            uint64_t base_ptr : 9;
+            uint64_t : 7;
+            uint64_t width : 6;
+            uint64_t : 2;
+            uint64_t format : 6;
+            uint64_t : 2;
+            uint64_t drawing_mask : 32;
+        };
+    };
+
 	struct GraphicsSynthesizer : public common::Component
 	{
 		friend struct GIF;
@@ -206,7 +221,8 @@ namespace gs
 		uint64_t dimx = 0, dthe = 0, colclamp = 0;
 		uint64_t test[2] = {};
 		uint64_t pabe = 0, fba[2];
-		uint64_t frame[2] = {}, zbuf[2] = {};
+        uint64_t zbuf[2] = {};
+        FRAME frame[2] = {};
 		BITBLTBUF bitbltbuf = {};
 		TRXPOS trxpos = {};
 		TRXREG trxreg = {};

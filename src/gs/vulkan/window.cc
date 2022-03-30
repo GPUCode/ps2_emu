@@ -36,9 +36,6 @@ void VkWindow::destroy()
     auto& device = context->device;
     device->waitIdle();
 
-    buffers.clear();
-    device->destroySwapchainKHR(swapchain);
-
     // Destroy sync objects
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
@@ -51,6 +48,9 @@ void VkWindow::destroy()
     device->destroyImage(depth_buffer.image);
     device->destroyImageView(depth_buffer.view);
     device->freeMemory(depth_buffer.memory);
+
+    buffers.clear();
+    device->destroySwapchainKHR(swapchain);
 
     context->instance->destroySurfaceKHR(surface);
 }

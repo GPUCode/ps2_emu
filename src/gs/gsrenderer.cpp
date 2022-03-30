@@ -19,27 +19,29 @@ namespace gs
         auto fragment = context->create_shader_module("shaders/fragment.glsl.spv");
         fragment.stage = vk::ShaderStageFlagBits::eFragment;
 
+        // Create VRAM texture and vertex buffer
+        vram = std::make_unique<VkTexture>(context);
+        buffer = std::make_unique<Buffer>(context, MAX_VERTICES);
+
+        // Configure texture
+        vram->create(640 * 200, 1, vk::ImageType::e1D, vk::Format::eR32Uint);
+
+        // Construct graphics pipeline
+        context->create_descriptor_sets(*vram);
         context->create_graphics_pipeline(vertex, fragment);
 
-        buffer = std::make_unique<Buffer>(context, MAX_VERTICES);
 	}
     
     GSRenderer::~GSRenderer()
     {
         // Manually destroy used vulkan resources
         buffer->destroy();
+        vram->destroy();
     }
 
     void GSRenderer::set_depth_function(uint32_t test_bits)
     {
         auto& context = window->context;
-        //auto& device = context->device;
-        //auto& queue = context->graphics_queue;
-
-        // Create an one-time submit command buffer
-        //vk::CommandBufferAllocateInfo alloc_info(context->command_pool, vk::CommandBufferLevel::ePrimary, 1);
-        //vk::CommandBuffer command_buffer = device->allocateCommandBuffers(alloc_info)[0];
-        //command_buffer.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
 
         // Set depth function
         auto& command_buffer = context->get_command_buffer();
@@ -57,15 +59,6 @@ namespace gs
         default:
             common::Emulator::terminate("[GS] Unknown depth function selected!\n");
         }
-
-        //command_buffer.end();
-
-        //vk::SubmitInfo submit_info({}, {}, {}, 1, &command_buffer);
-        //queue.submit(submit_info, nullptr);
-        //queue.waitIdle();
-
-        //device->freeCommandBuffers(context->command_pool, command_buffer);
-
     }
 
     void GSRenderer::render()
@@ -77,6 +70,8 @@ namespace gs
             auto& command_buffer = window->context->get_command_buffer();
             vk::DeviceSize offsets[1] = { 0 };
 
+            command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, window->context->pipeline_layout, 0,
+                                              window->context->descriptor_sets[window->current_frame], {});
             command_buffer.bindVertexBuffers(0, 1, &buffer->local_buffer, offsets);
             command_buffer.draw(vertex_count, 1, draw_data.size() - vertex_count, 0);
             vertex_count = 0;

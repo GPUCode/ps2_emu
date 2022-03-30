@@ -32,6 +32,8 @@ struct PipelineLayoutInfo
     std::vector<vk::PushConstantRange> push_const_ranges;
 };
 
+class VkTexture;
+
 // The vulkan context. Can only be created by the window
 class VkContext
 {
@@ -45,6 +47,7 @@ public:
     VkShader create_shader_module(std::filesystem::path filepath);
     vk::UniquePipelineLayout create_pipeline_layout(const PipelineLayoutInfo& info) const;
     void create_graphics_pipeline(VkShader& vertex, VkShader& fragment);
+    void create_descriptor_sets(VkTexture& texture);
 
     void init();
     void destroy();
@@ -71,6 +74,9 @@ public:
     vk::PipelineLayout pipeline_layout;
     vk::Pipeline graphics_pipeline;
     vk::RenderPass renderpass;
+    vk::DescriptorSetLayout descriptor_layout;
+    vk::DescriptorPool descriptor_pool;
+    std::vector<vk::DescriptorSet> descriptor_sets;
 
     // Command buffer
     vk::CommandPool command_pool;

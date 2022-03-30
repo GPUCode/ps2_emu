@@ -1,6 +1,7 @@
 #include <gs/vulkan/context.h>
 #include <gs/vulkan/buffer.h>
 #include <gs/vulkan/window.h>
+#include <gs/vulkan/texture.h>
 #include <fstream>
 #include <array>
 
@@ -15,6 +16,8 @@ VkContext::~VkContext()
 {
     device->waitIdle();
 
+    device->destroyDescriptorSetLayout(descriptor_layout);
+    device->destroyDescriptorPool(descriptor_pool);
     device->freeCommandBuffers(command_pool, command_buffers);
     device->destroyPipelineLayout(pipeline_layout);
     device->destroyPipeline(graphics_pipeline);
@@ -58,10 +61,7 @@ void VkContext::create_devices(int device_id)
 {
     // Pick a physical device
     auto physical_devices = instance->enumeratePhysicalDevices();
-    if (!physical_devices.empty())
-        physical_device = physical_devices[device_id];
-    else
-        throw std::runtime_error("[VK] Failed to find GPU with Vulkan support!");
+    physical_device = physical_devices.front();
 
     // Get available queue family properties
     auto family_props = physical_device.getQueueFamilyProperties();
@@ -82,7 +82,11 @@ void VkContext::create_devices(int device_id)
     std::array<const char*, 1> device_extensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
     auto queue_info = vk::DeviceQueueCreateInfo({}, queue_family, 1, &default_queue_priority);
-    vk::DeviceCreateInfo device_info({}, 1, &queue_info, 0, nullptr, device_extensions.size(), device_extensions.data());
+
+    std::array<vk::PhysicalDeviceFeatures, 1> features = {};
+    features[0].samplerAnisotropy = true;
+
+    vk::DeviceCreateInfo device_info({}, 1, &queue_info, 0, nullptr, device_extensions.size(), device_extensions.data(), features.data());
     device = physical_device.createDeviceUnique(device_info);
 
     graphics_queue = device->getQueue(queue_family, 0);
@@ -198,11 +202,11 @@ void VkContext::create_graphics_pipeline(VkShader& vertex, VkShader& fragment)
                                           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
 
     vk::PipelineColorBlendStateCreateInfo color_blending({}, VK_FALSE, vk::LogicOp::eCopy, 1, &colorblend_attachment, {0});
-    vk::PipelineLayoutCreateInfo pipeline_layout_info({}, 0, nullptr, 0, nullptr);
+    vk::PipelineLayoutCreateInfo pipeline_layout_info({}, 1, &descriptor_layout, 0, nullptr);
     try {
         pipeline_layout = device->createPipelineLayout(pipeline_layout_info);
     } catch (vk::SystemError err) {
-        throw std::runtime_error("failed to create pipeline layout!");
+        throw std::runtime_error("[VK] Failed to create pipeline layout!");
     }
 
     vk::DynamicState dynamic_states[2] = { vk::DynamicState::eDepthCompareOp, vk::DynamicState::eLineWidth };
@@ -210,7 +214,7 @@ void VkContext::create_graphics_pipeline(VkShader& vertex, VkShader& fragment)
 
     // Depth and stencil state containing depth and stencil compare and test operations
     // We only use depth tests and want depth tests and writes to be enabled and compare with less or equal
-    vk::PipelineDepthStencilStateCreateInfo depth_info({}, VK_TRUE, VK_TRUE, vk::CompareOp::eAlways, VK_FALSE, VK_FALSE);
+    vk::PipelineDepthStencilStateCreateInfo depth_info({}, VK_TRUE, VK_TRUE, vk::CompareOp::eGreaterOrEqual, VK_FALSE, VK_TRUE);
     depth_info.back.failOp = vk::StencilOp::eKeep;
     depth_info.back.passOp = vk::StencilOp::eKeep;
     depth_info.back.compareOp = vk::CompareOp::eAlways;
@@ -238,6 +242,40 @@ void VkContext::create_graphics_pipeline(VkShader& vertex, VkShader& fragment)
         graphics_pipeline = pipeline.value;
     else
         throw std::runtime_error("[VK] Couldn't create graphics pipeline");
+}
+
+constexpr int MAX_FRAMES_IN_FLIGHT = 3;
+
+void VkContext::create_descriptor_sets(VkTexture& texture)
+{
+    vk::DescriptorSetLayoutBinding sampler_layout_binding(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment);
+
+    std::array<vk::DescriptorSetLayoutBinding, 1> bindings = { sampler_layout_binding };
+    vk::DescriptorSetLayoutCreateInfo layout_info({}, bindings.size(), bindings.data());
+
+    descriptor_layout = device->createDescriptorSetLayout(layout_info);
+
+    std::array<vk::DescriptorPoolSize, 1> pool_sizes = { vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, MAX_FRAMES_IN_FLIGHT) };
+    vk::DescriptorPoolCreateInfo pool_info({}, MAX_FRAMES_IN_FLIGHT, pool_sizes.size(), pool_sizes.data());
+
+    descriptor_pool = device->createDescriptorPool(pool_info);
+
+    std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptor_layout);
+    vk::DescriptorSetAllocateInfo alloc_info(descriptor_pool, MAX_FRAMES_IN_FLIGHT, layouts.data());
+
+    descriptor_sets = device->allocateDescriptorSets(alloc_info);
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        auto& set = descriptor_sets[i];
+
+        vk::DescriptorImageInfo image_info(texture.texture_sampler, texture.texture_view, vk::ImageLayout::eShaderReadOnlyOptimal);
+        std::array<vk::WriteDescriptorSet, 1> descriptor_writes =
+        {
+            vk::WriteDescriptorSet(set, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &image_info)
+        };
+
+        device->updateDescriptorSets(descriptor_writes, {});
+   }
 }
 
 void VkContext::create_command_pool()

@@ -40,6 +40,7 @@ set(SOURCES
     src/gs/vulkan/context.cc
     src/gs/vulkan/window.cc
     src/gs/vulkan/buffer.cc
+    src/gs/vulkan/texture.cc
     src/cpu/ee/jit/jit.cc
     src/cpu/ee/jit/ir.cc
 )
@@ -69,9 +70,11 @@ set(HEADERS
     src/media/gamepad.h
     src/gs/gsvram.h
     src/gs/gsrenderer.h
+    src/gs/vulkan/common.h
     src/gs/vulkan/context.h
     src/gs/vulkan/window.h
     src/gs/vulkan/buffer.h
+    src/gs/vulkan/texture.h
     src/cpu/ee/jit/jit.h
     src/cpu/ee/jit/ir.h
 )

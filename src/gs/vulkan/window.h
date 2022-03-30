@@ -11,7 +11,6 @@ struct SwapchainBuffer
     ~SwapchainBuffer()
     {
         device->destroyImageView(view);
-        device->destroyImage(image);
         device->destroyFramebuffer(framebuffer);
     }
 
