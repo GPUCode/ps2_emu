@@ -47,6 +47,7 @@ public:
     void* memory = nullptr;
     vk::UniqueBuffer buffer;
     vk::UniqueDeviceMemory buffer_memory;
+    vk::UniqueBufferView buffer_view;
     uint32_t size = 0;
 
 protected:

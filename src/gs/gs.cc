@@ -343,7 +343,8 @@ namespace gs
 
             // Copy texture data to the GPU
             auto ptr = reinterpret_cast<uint8_t*>(&vram[frame[0].base_ptr * 32]);
-            renderer.vram->copy_pixels(ptr, 640 * 52);
+            std::memcpy(renderer.staging->memory, ptr, 640 * 224 * 4);
+            Buffer::copy_buffer(*renderer.staging, *renderer.pixels, vk::BufferCopy(0, 0, 640 * 224 * 4));
 
 			/* Deactivate TRXDIR */
 			trxdir = TRXDir::None;

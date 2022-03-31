@@ -20,6 +20,7 @@ Buffer::~Buffer()
 void Buffer::create(uint32_t byte_count, vk::MemoryPropertyFlags properties, vk::BufferUsageFlags usage)
 {
     auto& device = context->device;
+    size = byte_count;
 
     vk::BufferCreateInfo bufferInfo({}, byte_count, usage);
     buffer = device->createBufferUnique(bufferInfo);
@@ -32,8 +33,16 @@ void Buffer::create(uint32_t byte_count, vk::MemoryPropertyFlags properties, vk:
     buffer_memory = device->allocateMemoryUnique(alloc_info);
     device->bindBufferMemory(buffer.get(), buffer_memory.get(), 0);
 
+    // Optionally map the buffer to CPU memory
     if (properties & vk::MemoryPropertyFlagBits::eHostVisible)
         memory = device->mapMemory(buffer_memory.get(), 0, byte_count);
+
+    // Create buffer view for texel buffers
+    if (usage & vk::BufferUsageFlagBits::eStorageTexelBuffer || usage & vk::BufferUsageFlagBits::eUniformTexelBuffer)
+    {
+        vk::BufferViewCreateInfo view_info({}, buffer.get(), vk::Format::eR32Uint, 0, byte_count);
+        buffer_view = device->createBufferViewUnique(view_info);
+    }
 }
 
 void Buffer::bind(vk::CommandBuffer& command_buffer)

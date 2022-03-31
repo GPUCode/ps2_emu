@@ -13,18 +13,22 @@ namespace gs
         auto context = window->create_context();
 
         // Create VRAM texture and vertex buffer
-        vram = std::make_unique<VkTexture>(context);
         buffer = std::make_unique<VertexBuffer>(context);
+        pixels = std::make_unique<Buffer>(context);
+        staging = std::make_unique<Buffer>(context);
 
         // Configure texture
-        vram->create(32768, 1, vk::ImageType::e1D, vk::Format::eR32Uint);
         buffer->create(MAX_VERTICES);
+        pixels->create(640 * 224 * 4, vk::MemoryPropertyFlagBits::eDeviceLocal,
+                       vk::BufferUsageFlagBits::eStorageTexelBuffer | vk::BufferUsageFlagBits::eTransferDst);
+        staging->create(640 * 224 * 4, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                        vk::BufferUsageFlagBits::eTransferSrc);
 
         // Create vulkan graphics pipeline
         PipelineLayoutInfo info(context);
         info.add_shader_module("shaders/vertex.glsl.spv", vk::ShaderStageFlagBits::eVertex);
         info.add_shader_module("shaders/fragment.glsl.spv", vk::ShaderStageFlagBits::eFragment);
-        info.add_resource(vram.get(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment, 0);
+        info.add_resource(pixels.get(), vk::DescriptorType::eStorageTexelBuffer, vk::ShaderStageFlagBits::eFragment, 0);
 
         // Construct graphics pipeline
         context->create_graphics_pipeline(info);

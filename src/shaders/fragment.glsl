@@ -4,7 +4,7 @@
 layout(location = 0) in vec3 fragColor;
 layout(location = 0) out vec4 outColor;
 layout(location = 1) in vec2 fragTexCoord;
-layout(binding = 0) uniform usampler1D texSampler;
+layout(binding = 0) uniform usamplerBuffer texBuffer;
 
 uint convert_to_psmct32(ivec2 coord)
 {
@@ -41,12 +41,12 @@ uint convert_to_psmct32(ivec2 coord)
 
 void main()
 {
-    vec2 screen_coords = gl_FragCoord.xy * (vec2(640, 368) / vec2(800, 600));
+    vec2 screen_coords = gl_FragCoord.xy * (vec2(640, 224) / vec2(800, 600));
 
     // Account for VRAM swizzling
-    uint swizzled_coord = convert_to_psmct32(ivec2(gl_FragCoord));
+    uint swizzled_coord = convert_to_psmct32(ivec2(screen_coords));
 
-    uint pixel = texelFetch(texSampler, int(swizzled_coord), 0).r;
+    uint pixel = texelFetch(texBuffer, int(swizzled_coord)).r;
     uvec3 rgb = uvec3(pixel & 0xff, (pixel >> 8) & 0xff, (pixel >> 16) & 0xff);
     vec3 color = vec3(rgb) / vec3(255.0f);
     color += fragColor;

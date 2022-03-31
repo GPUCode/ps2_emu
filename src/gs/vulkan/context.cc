@@ -181,6 +181,9 @@ void VkContext::create_decriptor_sets(PipelineLayoutInfo &info)
         for (const auto& [group, resource_info] : info.resource_types)
         {
             auto& bindings = resource_info.second;
+            std::array<vk::DescriptorImageInfo, MAX_BINDING_COUNT> image_infos;
+            std::array<vk::DescriptorBufferInfo, MAX_BINDING_COUNT> buffer_infos;
+
             std::vector<vk::WriteDescriptorSet> descriptor_writes;
             descriptor_writes.reserve(bindings.size());
 
@@ -192,8 +195,15 @@ void VkContext::create_decriptor_sets(PipelineLayoutInfo &info)
                 case vk::DescriptorType::eCombinedImageSampler:
                 {
                     VkTexture* texture = reinterpret_cast<VkTexture*>(resource_info.first[j]);
-                    std::array<vk::DescriptorImageInfo, 1> image_info = { vk::DescriptorImageInfo(texture->texture_sampler.get(), texture->texture_view.get(), vk::ImageLayout::eShaderReadOnlyOptimal) };
-                    descriptor_writes.emplace_back(set, j, 0, vk::DescriptorType::eCombinedImageSampler, image_info);
+                    image_infos[j] = vk::DescriptorImageInfo(texture->texture_sampler.get(), texture->texture_view.get(),
+                                                             vk::ImageLayout::eShaderReadOnlyOptimal);
+                    descriptor_writes.emplace_back(set, j, 0, 1, vk::DescriptorType::eCombinedImageSampler, &image_infos[j]);
+                    break;
+                }
+                case vk::DescriptorType::eStorageTexelBuffer:
+                {
+                    Buffer* buffer = reinterpret_cast<Buffer*>(resource_info.first[j]);
+                    descriptor_writes.emplace_back(set, j, 0, 1, vk::DescriptorType::eStorageTexelBuffer, nullptr, nullptr, &buffer->buffer_view.get());
                     break;
                 }
                 default:
