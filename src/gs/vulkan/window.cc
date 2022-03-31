@@ -5,7 +5,7 @@
 #include <GLFW/glfw3.h>
 #include <fmt/core.h>
 
-constexpr int MAX_FRAMES_IN_FLIGHT = 3;
+constexpr uint64_t MAX_UINT64 = ~0ULL;
 
 VkWindow::VkWindow(int width, int height, std::string_view name) :
     width(width), height(height), name(name)
@@ -27,32 +27,12 @@ VkWindow::VkWindow(int width, int height, std::string_view name) :
 
 VkWindow::~VkWindow()
 {
-    glfwDestroyWindow(window);
-    glfwTerminate();
-}
-
-void VkWindow::destroy()
-{
     auto& device = context->device;
     device->waitIdle();
 
-    // Destroy sync objects
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        device->destroySemaphore(render_semaphores[i]);
-        device->destroySemaphore(image_semaphores[i]);
-        device->destroyFence(flight_fences[i]);
-    }
-
-    // Destroy depth buffer
-    device->destroyImage(depth_buffer.image);
-    device->destroyImageView(depth_buffer.view);
-    device->freeMemory(depth_buffer.memory);
-
     buffers.clear();
-    device->destroySwapchainKHR(swapchain);
-
-    context->instance->destroySurfaceKHR(surface);
+    glfwDestroyWindow(window);
+    glfwTerminate();
 }
 
 bool VkWindow::should_close() const
@@ -71,17 +51,13 @@ void VkWindow::begin_frame()
     glfwPollEvents();
 
     auto& device = context->device;
-    auto result = device->waitForFences(1, &flight_fences[current_frame], VK_TRUE, std::numeric_limits<uint64_t>::max());
-    if (result != vk::Result::eSuccess)
+    if (auto result = device->waitForFences(flight_fences[current_frame].get(), true, MAX_UINT64); result != vk::Result::eSuccess)
         throw std::runtime_error("[VK] Failed waiting for flight fences");
-    result = device->resetFences(1, &flight_fences[current_frame]);
-    if (result != vk::Result::eSuccess)
-        throw std::runtime_error("[VK] Failed reseting flight fences");
 
+    device->resetFences(flight_fences[current_frame].get());
     try
     {
-        vk::ResultValue result = device->acquireNextImageKHR(swapchain, std::numeric_limits<uint64_t>::max(),
-            image_semaphores[current_frame], nullptr);
+        vk::ResultValue result = device->acquireNextImageKHR(swapchain.get(), MAX_UINT64, image_semaphores[current_frame].get(), nullptr);
         image_index = result.value;
     }
     catch (vk::OutOfDateKHRError err)
@@ -96,18 +72,58 @@ void VkWindow::begin_frame()
 
     // Start command buffer recording
     auto& command_buffer = context->get_command_buffer();
-    command_buffer.begin({vk::CommandBufferUsageFlagBits::eSimultaneousUse});
+    command_buffer.begin({ vk::CommandBufferUsageFlagBits::eSimultaneousUse });
 
     // Clear the screen
     vk::ClearValue clear_values[2];
-    clear_values[0].color = {std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f }};
+    clear_values[0].color = { std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f } };
     clear_values[1].depthStencil = vk::ClearDepthStencilValue(0.0f, 0.0f);
 
     vk::Rect2D render_area({0, 0}, swapchain_info.extent);
-    vk::RenderPassBeginInfo renderpass_info(context->renderpass, buffers[current_frame].framebuffer, render_area, 2, clear_values);
+    vk::RenderPassBeginInfo renderpass_info(context->renderpass.get(), buffers[current_frame].framebuffer, render_area, 2, clear_values);
 
     command_buffer.beginRenderPass(renderpass_info, vk::SubpassContents::eInline);
-    command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, context->graphics_pipeline);
+    command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, context->graphics_pipeline.get());
+    command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, context->pipeline_layout.get(), 0,
+                                      context->descriptor_sets[current_frame], {});
+}
+
+void VkWindow::end_frame()
+{
+    // Finish recording
+    auto& command_buffer = context->get_command_buffer();
+    command_buffer.endRenderPass();
+    command_buffer.end();
+
+    std::array<vk::PipelineStageFlags, 1> wait_stages = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
+    std::array<vk::CommandBuffer, 1> command_buffers = { context->get_command_buffer() };
+
+    submit_info = vk::SubmitInfo(image_semaphores[current_frame].get(), wait_stages, command_buffers, render_semaphores[current_frame].get());
+    context->graphics_queue.submit(submit_info, flight_fences[current_frame].get());
+
+    vk::PresentInfoKHR present_info(render_semaphores[current_frame].get(), swapchain.get(), image_index);
+    vk::Result result;
+    try
+    {
+        result = present_queue.presentKHR(present_info);
+    }
+    catch (vk::OutOfDateKHRError err)
+    {
+        result = vk::Result::eErrorOutOfDateKHR;
+    }
+    catch (vk::SystemError err)
+    {
+        throw std::runtime_error("failed to present swap chain image!");
+    }
+
+    if (result == vk::Result::eSuboptimalKHR || result == vk::Result::eSuboptimalKHR || framebuffer_resized)
+    {
+        framebuffer_resized = false;
+        // recreate_swapchain();
+        return;
+    }
+
+    current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 std::shared_ptr<VkContext> VkWindow::create_context(bool validation)
@@ -130,44 +146,19 @@ std::shared_ptr<VkContext> VkWindow::create_context(bool validation)
         instance_info.ppEnabledLayerNames = layers;
     }
 
-    auto instance = vk::createInstance(instance_info);
+    auto instance = vk::createInstanceUnique(instance_info);
 
     // Create a surface for our window
     VkSurfaceKHR surface_tmp;
-    if (glfwCreateWindowSurface(instance, window, nullptr, &surface_tmp) != VK_SUCCESS)
+    if (glfwCreateWindowSurface(instance.get(), window, nullptr, &surface_tmp) != VK_SUCCESS)
         throw std::runtime_error("[WINDOW] Could not create window surface\n");
 
-    surface = surface_tmp;
-
-    // Setup debug callback to display validation layer messages
-    if (validation)
-    {
-        auto debug_callback = [](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-            VkDebugUtilsMessageTypeFlagsEXT messageType,
-            const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-            void* pUserData) -> VkBool32
-        {
-            fmt::print("[DEBUG] {}\n", pCallbackData->pMessage);
-            return VK_FALSE;
-        };
-
-        auto dispatch = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr);
-        auto debug_info = vk::DebugUtilsMessengerCreateInfoEXT({},
-                          vk::DebugUtilsMessageSeverityFlagBitsEXT::eError |
-                          vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-                          vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose |
-                          vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo,
-                          vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-                          vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-                          vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-                          debug_callback);
-        auto messenger = instance.createDebugUtilsMessengerEXTUnique(debug_info, nullptr, dispatch);
-    }
+    surface = vk::UniqueSurfaceKHR(surface_tmp);
 
     // Create context
-    context = std::make_shared<VkContext>(instance, this);
+    context = std::make_shared<VkContext>(std::move(instance), this);
     swapchain_info = get_swapchain_info();
-    context->init();
+    context->create(swapchain_info);
 
     // Create swapchain
     create_present_queue();
@@ -186,7 +177,7 @@ void VkWindow::create_present_queue()
     // Determine a queueFamilyIndex that suports present
     // first check if the graphicsQueueFamiliyIndex is good enough
     size_t present_queue_family = -1;
-    if (physical_device.getSurfaceSupportKHR(context->queue_family, surface))
+    if (physical_device.getSurfaceSupportKHR(context->queue_family, surface.get()))
     {
         present_queue_family = context->queue_family;
     }
@@ -197,7 +188,7 @@ void VkWindow::create_present_queue()
         vk::QueueFlags search = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute;
         for (size_t i = 0; i < family_props.size(); i++ )
         {
-            if (((family_props[i].queueFlags & search) == search) && physical_device.getSurfaceSupportKHR(i, surface))
+            if (((family_props[i].queueFlags & search) == search) && physical_device.getSurfaceSupportKHR(i, surface.get()))
             {
                 context->queue_family = present_queue_family = i;
                 break;
@@ -210,7 +201,7 @@ void VkWindow::create_present_queue()
             // family index that supports present
             for (size_t i = 0; i < family_props.size(); i++ )
             {
-                if (physical_device.getSurfaceSupportKHR(i, surface ))
+                if (physical_device.getSurfaceSupportKHR(i, surface.get()))
                 {
                     present_queue_family = i;
                     break;
@@ -229,10 +220,10 @@ void VkWindow::create_present_queue()
 void VkWindow::create_swapchain(bool enable_vsync)
 {
     auto& physical_device = context->physical_device;
-    vk::SwapchainKHR old_swapchain = swapchain;
+    vk::SwapchainKHR old_swapchain = swapchain.get();
 
     // Figure out best swapchain create attributes
-    auto capabilities = physical_device.getSurfaceCapabilitiesKHR(surface);
+    auto capabilities = physical_device.getSurfaceCapabilitiesKHR(surface.get());
 
     // Find the transformation of the surface, prefer a non-rotated transform
     auto pretransform = capabilities.supportedTransforms & vk::SurfaceTransformFlagBitsKHR::eIdentity ?
@@ -243,7 +234,7 @@ void VkWindow::create_swapchain(bool enable_vsync)
     vk::SwapchainCreateInfoKHR swapchain_create_info
     (
         {},
-        surface,
+        surface.get(),
         swapchain_info.image_count,
         swapchain_info.surface_format.format,
         swapchain_info.surface_format.colorSpace,
@@ -261,7 +252,7 @@ void VkWindow::create_swapchain(bool enable_vsync)
     );
 
     auto& device = context->device;
-    swapchain = device->createSwapchainKHR(swapchain_create_info);
+    swapchain = device->createSwapchainKHRUnique(swapchain_create_info);
 
     // If an existing sawp chain is re-created, destroy the old swap chain
     // This also cleans up all the presentable images
@@ -272,7 +263,7 @@ void VkWindow::create_swapchain(bool enable_vsync)
     }
 
     // Get the swap chain images
-    auto images = device->getSwapchainImagesKHR(swapchain);
+    auto images = device->getSwapchainImagesKHR(swapchain.get());
 
     // Create the swapchain buffers containing the image and imageview
     buffers.resize(images.size());
@@ -294,7 +285,7 @@ void VkWindow::create_swapchain(bool enable_vsync)
         vk::FramebufferCreateInfo framebuffer_info
         (
             {},
-            context->renderpass,
+            context->renderpass.get(),
             2,
             attachments,
             swapchain_info.extent.width,
@@ -312,68 +303,6 @@ void VkWindow::create_swapchain(bool enable_vsync)
 vk::Framebuffer VkWindow::get_framebuffer(int index) const
 {
     return buffers[index].framebuffer;
-}
-
-void VkWindow::end_frame()
-{
-    vk::Result result;
-    auto& device = context->device;
-
-    // Finish recording
-    auto& command_buffer = context->get_command_buffer();
-    command_buffer.endRenderPass();
-    command_buffer.end();
-
-    vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
-
-    submit_info = vk::SubmitInfo();
-    submit_info.waitSemaphoreCount = 1;
-    submit_info.pWaitSemaphores = &image_semaphores[current_frame];
-    submit_info.pWaitDstStageMask = waitStages;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &context->command_buffers[image_index];
-    submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &render_semaphores[current_frame];
-
-    context->graphics_queue.submit(submit_info, flight_fences[current_frame]);
-
-    vk::PresentInfoKHR presentInfo;
-    presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores =  &render_semaphores[current_frame];
-
-    presentInfo.swapchainCount = 1;
-    presentInfo.pSwapchains = &swapchain;
-    presentInfo.pImageIndices = &image_index;
-
-    //vk::Result result;
-    try
-    {
-        result = present_queue.presentKHR(presentInfo);
-    }
-    catch (vk::OutOfDateKHRError err)
-    {
-        result = vk::Result::eErrorOutOfDateKHR;
-    }
-    catch (vk::SystemError err)
-    {
-        throw std::runtime_error("failed to present swap chain image!");
-    }
-
-    if (result == vk::Result::eSuboptimalKHR || result == vk::Result::eSuboptimalKHR || framebuffer_resized)
-    {
-        framebuffer_resized = false;
-        // recreate_swapchain();
-        return;
-    }
-
-    current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
-}
-
-void VkWindow::acquire_next_image(vk::Semaphore semaphore, uint32_t image_index)
-{
-    auto& device = context->device;
-    auto result = device->acquireNextImageKHR(swapchain, UINT64_MAX, semaphore, vk::Fence());
-    image_index = result.value;
 }
 
 void VkWindow::create_depth_buffer()
@@ -422,7 +351,7 @@ SwapchainInfo VkWindow::get_swapchain_info() const
     auto& physical_device = context->physical_device;
 
     // Choose surface format
-    auto formats = physical_device.getSurfaceFormatsKHR(surface);
+    auto formats = physical_device.getSurfaceFormatsKHR(surface.get());
     info.surface_format = formats[0];
 
     if (formats.size() == 1 && formats[0].format == vk::Format::eUndefined)
@@ -443,11 +372,11 @@ SwapchainInfo VkWindow::get_swapchain_info() const
     }
 
     // Choose best present mode
-    auto present_modes = physical_device.getSurfacePresentModesKHR(surface);
+    auto present_modes = physical_device.getSurfacePresentModesKHR(surface.get());
     info.present_mode = vk::PresentModeKHR::eFifo;
 
     // Query surface capabilities
-    auto capabilities = physical_device.getSurfaceCapabilitiesKHR(surface);
+    auto capabilities = physical_device.getSurfaceCapabilitiesKHR(surface.get());
     info.extent = capabilities.currentExtent;
 
     if (capabilities.currentExtent.width == std::numeric_limits<uint32_t>::max())
@@ -500,20 +429,8 @@ void VkWindow::create_sync_objects()
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
-        image_semaphores[i] = device->createSemaphore({});
-        render_semaphores[i] = device->createSemaphore({});
-        flight_fences[i] = device->createFence({ vk::FenceCreateFlagBits::eSignaled });
+        image_semaphores[i] = device->createSemaphoreUnique({});
+        render_semaphores[i] = device->createSemaphoreUnique({});
+        flight_fences[i] = device->createFenceUnique({ vk::FenceCreateFlagBits::eSignaled });
     }
-}
-
-bool VkWindow::queue_present(vk::Queue queue, uint32_t image_index, vk::Semaphore wait_semaphore)
-{
-    vk::PresentInfoKHR present_info({}, {}, 1, &swapchain, &image_index);
-    if (wait_semaphore)
-    {
-        present_info.pWaitSemaphores = &wait_semaphore;
-        present_info.waitSemaphoreCount = 1;
-    }
-
-    return queue.presentKHR(present_info) == vk::Result::eSuccess;
 }

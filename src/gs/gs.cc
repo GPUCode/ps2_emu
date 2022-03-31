@@ -223,9 +223,8 @@ namespace gs
 			
             // Flush renderer
             auto& command_buffer = renderer.window->context->get_command_buffer();
-            vk::DeviceSize offsets[1] = { 0 };
 
-            command_buffer.bindVertexBuffers(0, 1, &renderer.buffer->local_buffer, offsets);
+            renderer.buffer->bind(command_buffer);
             command_buffer.draw(renderer.vertex_count, 1, renderer.draw_data.size() - renderer.vertex_count, 0);
             renderer.vertex_count = 0;
 
@@ -344,10 +343,7 @@ namespace gs
 
             // Copy texture data to the GPU
             auto ptr = reinterpret_cast<uint8_t*>(&vram[frame[0].base_ptr * 32]);
-            std::vector<uint8_t> pixels(640 * 368 * 4);
-
-            pixels.assign(ptr, ptr + pixels.size());
-            renderer.vram->copy_pixels(pixels);
+            renderer.vram->copy_pixels(ptr, 640 * 52);
 
 			/* Deactivate TRXDIR */
 			trxdir = TRXDir::None;

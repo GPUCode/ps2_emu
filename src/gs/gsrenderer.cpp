@@ -12,31 +12,27 @@ namespace gs
 	{
         auto context = window->create_context();
 
-        // Create vulkan graphics pipeline
-        auto vertex = context->create_shader_module("shaders/vertex.glsl.spv");
-        vertex.stage = vk::ShaderStageFlagBits::eVertex;
-
-        auto fragment = context->create_shader_module("shaders/fragment.glsl.spv");
-        fragment.stage = vk::ShaderStageFlagBits::eFragment;
-
         // Create VRAM texture and vertex buffer
         vram = std::make_unique<VkTexture>(context);
-        buffer = std::make_unique<Buffer>(context, MAX_VERTICES);
+        buffer = std::make_unique<VertexBuffer>(context);
 
         // Configure texture
-        vram->create(640 * 200, 1, vk::ImageType::e1D, vk::Format::eR32Uint);
+        vram->create(32768, 1, vk::ImageType::e1D, vk::Format::eR32Uint);
+        buffer->create(MAX_VERTICES);
+
+        // Create vulkan graphics pipeline
+        PipelineLayoutInfo info(context);
+        info.add_shader_module("shaders/vertex.glsl.spv", vk::ShaderStageFlagBits::eVertex);
+        info.add_shader_module("shaders/fragment.glsl.spv", vk::ShaderStageFlagBits::eFragment);
+        info.add_resource(vram.get(), vk::DescriptorType::eCombinedImageSampler, vk::ShaderStageFlagBits::eFragment, 0);
 
         // Construct graphics pipeline
-        context->create_descriptor_sets(*vram);
-        context->create_graphics_pipeline(vertex, fragment);
+        context->create_graphics_pipeline(info);
 
 	}
     
     GSRenderer::~GSRenderer()
     {
-        // Manually destroy used vulkan resources
-        buffer->destroy();
-        vram->destroy();
     }
 
     void GSRenderer::set_depth_function(uint32_t test_bits)
@@ -68,16 +64,13 @@ namespace gs
         {
             // Flush renderer
             auto& command_buffer = window->context->get_command_buffer();
-            vk::DeviceSize offsets[1] = { 0 };
 
-            command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, window->context->pipeline_layout, 0,
-                                              window->context->descriptor_sets[window->current_frame], {});
-            command_buffer.bindVertexBuffers(0, 1, &buffer->local_buffer, offsets);
+            buffer->bind(command_buffer);
             command_buffer.draw(vertex_count, 1, draw_data.size() - vertex_count, 0);
             vertex_count = 0;
 
             // Copy the vertices to the GPU
-            buffer->copy_vertices(draw_data);
+            buffer->copy_vertices(draw_data.data(), draw_data.size());
             draw_data.clear();
         }
     }

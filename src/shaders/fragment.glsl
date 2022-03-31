@@ -44,9 +44,9 @@ void main()
     vec2 screen_coords = gl_FragCoord.xy * (vec2(640, 368) / vec2(800, 600));
 
     // Account for VRAM swizzling
-    uint swizzled_coords = convert_to_psmct32(ivec2(gl_FragCoord));
+    uint swizzled_coord = convert_to_psmct32(ivec2(gl_FragCoord));
 
-    uint pixel = texelFetch(texSampler, int(swizzled_coords), 0).r;
+    uint pixel = texelFetch(texSampler, int(swizzled_coord), 0).r;
     uvec3 rgb = uvec3(pixel & 0xff, (pixel >> 8) & 0xff, (pixel >> 16) & 0xff);
     vec3 color = vec3(rgb) / vec3(255.0f);
     color += fragColor;

@@ -5,80 +5,61 @@
 #include <type_traits>
 #include <cstring>
 
-Buffer::Buffer(std::shared_ptr<VkContext> context, uint32_t size)
+Buffer::Buffer(std::shared_ptr<VkContext> context) :
+    context(context)
 {
-    init(context, size);
 }
 
-void Buffer::init(std::shared_ptr<VkContext> context, uint32_t size)
+Buffer::~Buffer()
 {
-    this->context = context;
-    this->size = size;
-
     auto& device = context->device;
-    auto bytes = sizeof(Vertex) * size;
-
-    auto host_flags = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
-    create_buffer(bytes, vk::BufferUsageFlagBits::eTransferSrc, host_flags, host_buffer, host_buffer_memory);
-    host_memory = device->mapMemory(host_buffer_memory, 0, bytes);
-
-    auto local_flags = vk::MemoryPropertyFlagBits::eDeviceLocal;
-    create_buffer(bytes, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, local_flags, local_buffer, local_buffer_memory);
+    if (memory != nullptr)
+        device->unmapMemory(buffer_memory.get());
 }
 
-void Buffer::destroy()
+void Buffer::create(uint32_t byte_count, vk::MemoryPropertyFlags properties, vk::BufferUsageFlags usage)
 {
     auto& device = context->device;
 
-    device->unmapMemory(host_buffer_memory);
-    device->destroyBuffer(local_buffer);
-    device->destroyBuffer(host_buffer);
-    device->freeMemory(local_buffer_memory);
-    device->freeMemory(host_buffer_memory);
-}
+    vk::BufferCreateInfo bufferInfo({}, byte_count, usage);
+    buffer = device->createBufferUnique(bufferInfo);
 
-void Buffer::copy_vertices(const std::vector<Vertex>& vertices)
-{
-    auto bytes = vertices.size() * sizeof(Vertex);
-    std::memcpy(host_memory, vertices.data(), bytes);
-    copy_buffer(host_buffer, local_buffer, bytes);
-}
-
-void Buffer::create_buffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties,
-                           vk::Buffer& buffer, vk::DeviceMemory& buffer_memory)
-{
-    auto& device = context->device;
-
-    vk::BufferCreateInfo bufferInfo({}, size, usage);
-    buffer = device->createBuffer(bufferInfo);
-
-    vk::MemoryRequirements mem_requirements = device->getBufferMemoryRequirements(buffer);
+    auto mem_requirements = device->getBufferMemoryRequirements(buffer.get());
 
     auto memory_type_index = find_memory_type(mem_requirements.memoryTypeBits, properties, context);
     vk::MemoryAllocateInfo alloc_info(mem_requirements.size, memory_type_index);
 
-    buffer_memory = device->allocateMemory(alloc_info);
-    device->bindBufferMemory(buffer, buffer_memory, 0);
+    buffer_memory = device->allocateMemoryUnique(alloc_info);
+    device->bindBufferMemory(buffer.get(), buffer_memory.get(), 0);
+
+    if (properties & vk::MemoryPropertyFlagBits::eHostVisible)
+        memory = device->mapMemory(buffer_memory.get(), 0, byte_count);
 }
 
-void Buffer::copy_buffer(vk::Buffer src_buffer, vk::Buffer dst_buffer, vk::DeviceSize size)
+void Buffer::bind(vk::CommandBuffer& command_buffer)
 {
+    vk::DeviceSize offsets[1] = { 0 };
+    command_buffer.bindVertexBuffers(0, 1, &buffer.get(), offsets);
+}
+
+void Buffer::copy_buffer(Buffer& src_buffer, Buffer& dst_buffer, const vk::BufferCopy& region)
+{
+    auto& context = src_buffer.context;
     auto& device = context->device;
     auto& queue = context->graphics_queue;
 
-    vk::CommandBufferAllocateInfo alloc_info(context->command_pool, vk::CommandBufferLevel::ePrimary, 1);
+    vk::CommandBufferAllocateInfo alloc_info(context->command_pool.get(), vk::CommandBufferLevel::ePrimary, 1);
     vk::CommandBuffer command_buffer = device->allocateCommandBuffers(alloc_info)[0];
 
-    vk::BufferCopy copy_region(0, 0, size);
     command_buffer.begin({vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-    command_buffer.copyBuffer(src_buffer, dst_buffer, copy_region);
+    command_buffer.copyBuffer(src_buffer.buffer.get(), dst_buffer.buffer.get(), region);
     command_buffer.end();
 
     vk::SubmitInfo submit_info({}, {}, {}, 1, &command_buffer);
     queue.submit(submit_info, nullptr);
     queue.waitIdle();
 
-    device->freeCommandBuffers(context->command_pool, command_buffer);
+    device->freeCommandBuffers(context->command_pool.get(), command_buffer);
 }
 
 uint32_t Buffer::find_memory_type(uint32_t type_filter, vk::MemoryPropertyFlags properties, std::shared_ptr<VkContext> context)
@@ -93,4 +74,31 @@ uint32_t Buffer::find_memory_type(uint32_t type_filter, vk::MemoryPropertyFlags 
     }
 
     throw std::runtime_error("[VK] Failed to find suitable memory type!");
+}
+
+VertexBuffer::VertexBuffer(const std::shared_ptr<VkContext>& context) :
+    host(context), local(context), context(context)
+{
+}
+
+void VertexBuffer::create(uint32_t vertex_count)
+{
+    // Create a host and local buffer
+    auto byte_count = sizeof(Vertex) * vertex_count;
+    local.create(byte_count, vk::MemoryPropertyFlagBits::eDeviceLocal,
+                 vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer);
+    host.create(byte_count, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+                vk::BufferUsageFlagBits::eTransferSrc);
+}
+
+void VertexBuffer::copy_vertices(Vertex* vertices, uint32_t count)
+{
+    auto byte_count = count * sizeof(Vertex);
+    std::memcpy(host.memory, vertices, byte_count);
+    Buffer::copy_buffer(host, local, { 0, 0, byte_count });
+}
+
+void VertexBuffer::bind(vk::CommandBuffer& command_buffer)
+{
+    local.bind(command_buffer);
 }

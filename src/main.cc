@@ -23,7 +23,6 @@ int main()
         fmt::print("{}\n", e.what());
     }
 
-    window.destroy();
     return 0;
 }
 

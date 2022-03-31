@@ -5,43 +5,20 @@
 #include <fstream>
 #include <array>
 
-VkContext::VkContext(vk::Instance instance_, VkWindow* window) :
-    instance(instance_), window(window)
+PipelineLayoutInfo::PipelineLayoutInfo(const std::shared_ptr<VkContext>& context) :
+    context(context)
 {
-    // Make sure the physical devices are available on construction
-    create_devices();
 }
 
-VkContext::~VkContext()
+PipelineLayoutInfo::~PipelineLayoutInfo()
 {
-    device->waitIdle();
-
-    device->destroyDescriptorSetLayout(descriptor_layout);
-    device->destroyDescriptorPool(descriptor_pool);
-    device->freeCommandBuffers(command_pool, command_buffers);
-    device->destroyPipelineLayout(pipeline_layout);
-    device->destroyPipeline(graphics_pipeline);
-    device->destroyRenderPass(renderpass);
-    device->destroyCommandPool(command_pool);
+    for (int i = 0; i < shader_stages.size(); i++)
+        context->device->destroyShaderModule(shader_stages[i].module);
 }
 
-void VkContext::init()
+void PipelineLayoutInfo::add_shader_module(std::string_view filepath, vk::ShaderStageFlagBits stage)
 {
-    // Initialize context
-    create_renderpass();
-    create_command_pool();
-    create_command_buffers();
-}
-
-vk::CommandBuffer& VkContext::get_command_buffer()
-{
-    return command_buffers[window->image_index];
-}
-
-VkShader VkContext::create_shader_module(std::filesystem::path filepath)
-{
-    VkShader shader(device.get());
-    std::ifstream shaderfile(filepath.c_str(), std::ios::ate | std::ios::binary);
+    std::ifstream shaderfile(filepath.data(), std::ios::ate | std::ios::binary);
 
     if (!shaderfile.is_open())
         throw std::runtime_error("[UTIL] Failed to open shader file!");
@@ -53,8 +30,44 @@ VkShader VkContext::create_shader_module(std::filesystem::path filepath)
     shaderfile.read(buffer.data(), size);
     shaderfile.close();
 
-    shader.module = device->createShaderModule({ {}, buffer.size(), reinterpret_cast<const uint32_t*>(buffer.data()) });
-    return shader;
+    auto module = context->device->createShaderModule({ {}, buffer.size(), reinterpret_cast<const uint32_t*>(buffer.data()) });
+    shader_stages.emplace_back(vk::PipelineShaderStageCreateFlags(), stage, module, "main");
+}
+
+void PipelineLayoutInfo::add_resource(Resource* resource, vk::DescriptorType type, vk::ShaderStageFlags stages, int binding, int group)
+{
+    resource_types[group].first[binding] = resource;
+    resource_types[group].second.emplace_back(binding, type, 1, stages);
+    needed[type]++;
+}
+
+VkContext::VkContext(vk::UniqueInstance&& instance_, VkWindow* window) :
+    instance(std::move(instance_)), window(window)
+{
+    create_devices();
+}
+
+VkContext::~VkContext()
+{
+    device->waitIdle();
+
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+        for (int j = 0; j < descriptor_sets.size(); j++)
+            device->destroyDescriptorSetLayout(descriptor_layouts[i][j]);
+}
+
+void VkContext::create(SwapchainInfo& info)
+{
+    swapchain_info = info;
+
+    // Initialize context
+    create_renderpass();
+    create_command_buffers();
+}
+
+vk::CommandBuffer& VkContext::get_command_buffer()
+{
+    return command_buffers[window->image_index].get();
 }
 
 void VkContext::create_devices(int device_id)
@@ -68,7 +81,7 @@ void VkContext::create_devices(int device_id)
 
     // Discover a queue with both graphics and compute capabilities
     vk::QueueFlags search = vk::QueueFlagBits::eGraphics | vk::QueueFlagBits::eCompute;
-    for (int i = 0; i < family_props.size(); i++)
+    for (size_t i = 0; i < family_props.size(); i++)
     {
         auto& family = family_props[i];
         if ((family.queueFlags & search) == search)
@@ -136,40 +149,67 @@ void VkContext::create_renderpass()
 
     vk::SubpassDescription subpass({}, vk::PipelineBindPoint::eGraphics, {}, {}, 1, &color_attachment_ref, {}, &depth_attachment_ref);
     vk::RenderPassCreateInfo renderpass_info({}, 2, attachments, 1, &subpass, 1, &dependency);
-    renderpass = device->createRenderPass(renderpass_info);
+    renderpass = device->createRenderPassUnique(renderpass_info);
 }
 
-vk::UniquePipelineLayout VkContext::create_pipeline_layout(const PipelineLayoutInfo& info) const
+void VkContext::create_decriptor_sets(PipelineLayoutInfo &info)
 {
-    vk::PipelineLayoutCreateInfo pipelineLayoutInfo
-    (
-        {},
-        info.set_layouts.size(),
-        info.set_layouts.data(),
-        info.push_const_ranges.size(),
-        info.push_const_ranges.data()
-    );
-
-    return device->createPipelineLayoutUnique(pipelineLayoutInfo);
-}
-
-void VkContext::create_graphics_pipeline(VkShader& vertex, VkShader& fragment)
-{
-    vk::PipelineShaderStageCreateInfo shader_stages[] =
+    std::vector<vk::DescriptorPoolSize> pool_sizes;
+    pool_sizes.reserve(info.needed.size());
+    for (const auto& [type, count] : info.needed)
     {
+        pool_sizes.emplace_back(type, count * MAX_FRAMES_IN_FLIGHT);
+    }
+
+    for (const auto& [group, resource_info] : info.resource_types)
+    {
+        auto& bindings = resource_info.second;
+        vk::DescriptorSetLayoutCreateInfo layout_info({}, bindings.size(), bindings.data());
+
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+            descriptor_layouts[i].push_back(device->createDescriptorSetLayout(layout_info));
+    }
+
+    vk::DescriptorPoolCreateInfo pool_info({}, MAX_FRAMES_IN_FLIGHT * descriptor_layouts[0].size(), pool_sizes.size(), pool_sizes.data());
+    descriptor_pool = device->createDescriptorPoolUnique(pool_info);
+
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+    {
+        vk::DescriptorSetAllocateInfo alloc_info(descriptor_pool.get(), descriptor_layouts[i]);
+        descriptor_sets[i] = device->allocateDescriptorSets(alloc_info);
+
+        for (const auto& [group, resource_info] : info.resource_types)
         {
-            {},
-            vk::ShaderStageFlagBits::eVertex,
-            vertex.module,
-            "main"
-        },
-        {
-            {},
-            vk::ShaderStageFlagBits::eFragment,
-            fragment.module,
-            "main"
+            auto& bindings = resource_info.second;
+            std::vector<vk::WriteDescriptorSet> descriptor_writes;
+            descriptor_writes.reserve(bindings.size());
+
+            auto& set = descriptor_sets[i][group];
+            for (int j = 0; j < bindings.size(); j++)
+            {
+                switch (bindings[j].descriptorType)
+                {
+                case vk::DescriptorType::eCombinedImageSampler:
+                {
+                    VkTexture* texture = reinterpret_cast<VkTexture*>(resource_info.first[j]);
+                    std::array<vk::DescriptorImageInfo, 1> image_info = { vk::DescriptorImageInfo(texture->texture_sampler.get(), texture->texture_view.get(), vk::ImageLayout::eShaderReadOnlyOptimal) };
+                    descriptor_writes.emplace_back(set, j, 0, vk::DescriptorType::eCombinedImageSampler, image_info);
+                    break;
+                }
+                default:
+                    throw std::runtime_error("[VK] Unknown resource");
+                }
+            }
+
+            device->updateDescriptorSets(descriptor_writes, {});
+            descriptor_writes.clear();
         }
-    };
+    }
+}
+
+void VkContext::create_graphics_pipeline(PipelineLayoutInfo& info)
+{
+    create_decriptor_sets(info);
 
     vk::PipelineVertexInputStateCreateInfo vertex_input_info
     (
@@ -202,12 +242,9 @@ void VkContext::create_graphics_pipeline(VkShader& vertex, VkShader& fragment)
                                           vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
 
     vk::PipelineColorBlendStateCreateInfo color_blending({}, VK_FALSE, vk::LogicOp::eCopy, 1, &colorblend_attachment, {0});
-    vk::PipelineLayoutCreateInfo pipeline_layout_info({}, 1, &descriptor_layout, 0, nullptr);
-    try {
-        pipeline_layout = device->createPipelineLayout(pipeline_layout_info);
-    } catch (vk::SystemError err) {
-        throw std::runtime_error("[VK] Failed to create pipeline layout!");
-    }
+
+    vk::PipelineLayoutCreateInfo pipeline_layout_info({}, descriptor_layouts[0], {});
+    pipeline_layout = device->createPipelineLayoutUnique(pipeline_layout_info);
 
     vk::DynamicState dynamic_states[2] = { vk::DynamicState::eDepthCompareOp, vk::DynamicState::eLineWidth };
     vk::PipelineDynamicStateCreateInfo dynamic_info({}, 2, dynamic_states);
@@ -223,8 +260,8 @@ void VkContext::create_graphics_pipeline(VkShader& vertex, VkShader& fragment)
     vk::GraphicsPipelineCreateInfo pipeline_info
     (
         {},
-        2,
-        shader_stages,
+        info.shader_stages.size(),
+        info.shader_stages.data(),
         &vertex_input_info,
         &input_assembly,
         nullptr,
@@ -233,66 +270,24 @@ void VkContext::create_graphics_pipeline(VkShader& vertex, VkShader& fragment)
         &depth_info,
         &color_blending,
         &dynamic_info,
-        pipeline_layout,
-        renderpass
+        pipeline_layout.get(),
+        renderpass.get()
     );
 
-    auto pipeline = device->createGraphicsPipeline(nullptr, pipeline_info);
+    auto pipeline = device->createGraphicsPipelineUnique(nullptr, pipeline_info);
     if (pipeline.result == vk::Result::eSuccess)
-        graphics_pipeline = pipeline.value;
+        graphics_pipeline = std::move(pipeline.value);
     else
         throw std::runtime_error("[VK] Couldn't create graphics pipeline");
 }
 
-constexpr int MAX_FRAMES_IN_FLIGHT = 3;
-
-void VkContext::create_descriptor_sets(VkTexture& texture)
-{
-    vk::DescriptorSetLayoutBinding sampler_layout_binding(0, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment);
-
-    std::array<vk::DescriptorSetLayoutBinding, 1> bindings = { sampler_layout_binding };
-    vk::DescriptorSetLayoutCreateInfo layout_info({}, bindings.size(), bindings.data());
-
-    descriptor_layout = device->createDescriptorSetLayout(layout_info);
-
-    std::array<vk::DescriptorPoolSize, 1> pool_sizes = { vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, MAX_FRAMES_IN_FLIGHT) };
-    vk::DescriptorPoolCreateInfo pool_info({}, MAX_FRAMES_IN_FLIGHT, pool_sizes.size(), pool_sizes.data());
-
-    descriptor_pool = device->createDescriptorPool(pool_info);
-
-    std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptor_layout);
-    vk::DescriptorSetAllocateInfo alloc_info(descriptor_pool, MAX_FRAMES_IN_FLIGHT, layouts.data());
-
-    descriptor_sets = device->allocateDescriptorSets(alloc_info);
-    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        auto& set = descriptor_sets[i];
-
-        vk::DescriptorImageInfo image_info(texture.texture_sampler, texture.texture_view, vk::ImageLayout::eShaderReadOnlyOptimal);
-        std::array<vk::WriteDescriptorSet, 1> descriptor_writes =
-        {
-            vk::WriteDescriptorSet(set, 0, 0, 1, vk::DescriptorType::eCombinedImageSampler, &image_info)
-        };
-
-        device->updateDescriptorSets(descriptor_writes, {});
-   }
-}
-
-void VkContext::create_command_pool()
-{
-    vk::CommandPoolCreateInfo pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queue_family);
-    command_pool = device->createCommandPool(pool_info);
-}
-
 void VkContext::create_command_buffers()
 {
+    vk::CommandPoolCreateInfo pool_info(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queue_family);
+    command_pool = device->createCommandPoolUnique(pool_info);
+
     command_buffers.resize(window->swapchain_info.image_count);
 
-    vk::CommandBufferAllocateInfo alloc_info(command_pool, vk::CommandBufferLevel::ePrimary, command_buffers.size());
-    command_buffers = device->allocateCommandBuffers(alloc_info);
-}
-
-void VkContext::destroy()
-{
-    device->waitIdle();
+    vk::CommandBufferAllocateInfo alloc_info(command_pool.get(), vk::CommandBufferLevel::ePrimary, command_buffers.size());
+    command_buffers = device->allocateCommandBuffersUnique(alloc_info);
 }

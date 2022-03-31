@@ -1,35 +1,30 @@
 #pragma once
-#include <vulkan/vulkan.hpp>
-#include <filesystem>
-#include <optional>
+#include <gs/vulkan/common.h>
+#include <gs/vulkan/window.h>
+#include <string_view>
+#include <robin_hood.h>
 
 class VkWindow;
+class VkContext;
 
-// Vulkan shader abstraction
-struct VkShader
-{
-    VkShader(vk::Device& device) : device(device) {};
-    VkShader(vk::ShaderStageFlagBits stage, vk::ShaderModule module, vk::Device& device) :
-        module(module), stage(stage), device(device) {}
-    ~VkShader()
-    {
-        device.destroyShaderModule(module);
-    }
-
-    // Make object non-copyable
-    VkShader(const VkShader&) = delete;
-    VkShader& operator=(const VkShader&) = delete;
-    VkShader(VkShader&&) = default;
-
-    vk::ShaderModule module;
-    vk::ShaderStageFlagBits stage;
-    vk::Device& device;
-};
+constexpr int MAX_BINDING_COUNT = 10;
 
 struct PipelineLayoutInfo
 {
-    std::vector<vk::DescriptorSetLayout> set_layouts;
-    std::vector<vk::PushConstantRange> push_const_ranges;
+    friend class VkContext;
+    PipelineLayoutInfo(const std::shared_ptr<VkContext>& context);
+    ~PipelineLayoutInfo();
+
+    void add_shader_module(std::string_view filepath, vk::ShaderStageFlagBits stage);
+    void add_resource(Resource* resource, vk::DescriptorType type, vk::ShaderStageFlags stages, int binding, int group = 0);
+
+private:
+    using DescInfo = std::pair<std::array<Resource*, MAX_BINDING_COUNT>, std::vector<vk::DescriptorSetLayoutBinding>>;
+
+    std::shared_ptr<VkContext> context;
+    robin_hood::unordered_flat_map<int, DescInfo> resource_types;
+    robin_hood::unordered_flat_map<vk::DescriptorType, int> needed;
+    std::vector<vk::PipelineShaderStageCreateInfo> shader_stages;
 };
 
 class VkTexture;
@@ -39,26 +34,19 @@ class VkContext
 {
     friend class VkWindow;
 public:
-    VkContext(vk::Instance instance, VkWindow* window);
+    VkContext(vk::UniqueInstance&& instance, VkWindow* window);
     ~VkContext();
-    VkContext(VkContext&&) = default;
 
-    // Shader creation helpers
-    VkShader create_shader_module(std::filesystem::path filepath);
-    vk::UniquePipelineLayout create_pipeline_layout(const PipelineLayoutInfo& info) const;
-    void create_graphics_pipeline(VkShader& vertex, VkShader& fragment);
-    void create_descriptor_sets(VkTexture& texture);
-
-    void init();
-    void destroy();
+    void create(SwapchainInfo& info);
+    void create_graphics_pipeline(PipelineLayoutInfo& info);
 
     vk::CommandBuffer& get_command_buffer();
 
 private:
     void create_devices(int device_id = 0);
     void create_renderpass();
-    void create_command_pool();
     void create_command_buffers();
+    void create_decriptor_sets(PipelineLayoutInfo& info);
 
 public:
     // Queue family indexes
@@ -71,17 +59,18 @@ public:
     vk::Queue graphics_queue;
 
     // Pipeline
-    vk::PipelineLayout pipeline_layout;
-    vk::Pipeline graphics_pipeline;
-    vk::RenderPass renderpass;
-    vk::DescriptorSetLayout descriptor_layout;
-    vk::DescriptorPool descriptor_pool;
-    std::vector<vk::DescriptorSet> descriptor_sets;
+    vk::UniquePipelineLayout pipeline_layout;
+    vk::UniquePipeline graphics_pipeline;
+    vk::UniqueRenderPass renderpass;
+    vk::UniqueDescriptorPool descriptor_pool;
+    std::array<std::vector<vk::DescriptorSetLayout>, MAX_FRAMES_IN_FLIGHT> descriptor_layouts;
+    std::array<std::vector<vk::DescriptorSet>, MAX_FRAMES_IN_FLIGHT> descriptor_sets;
 
     // Command buffer
-    vk::CommandPool command_pool;
-    std::vector<vk::CommandBuffer> command_buffers;
+    vk::UniqueCommandPool command_pool;
+    std::vector<vk::UniqueCommandBuffer> command_buffers;
 
     // Window
     VkWindow* window;
+    SwapchainInfo swapchain_info;
 };

@@ -39,7 +39,7 @@ namespace gs
     public:
         VkWindow* window = nullptr;
 		std::vector<GSVertex> draw_data;
-        std::unique_ptr<Buffer> buffer;
+        std::unique_ptr<VertexBuffer> buffer;
         std::unique_ptr<VkTexture> vram;
         int vertex_count = 0;
 	};

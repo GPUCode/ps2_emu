@@ -1,5 +1,5 @@
 #pragma once
-#include <vulkan/vulkan.hpp>
+#include <gs/vulkan/common.h>
 #include <string_view>
 #include <memory>
 
@@ -29,12 +29,23 @@ struct SwapchainInfo
     uint32_t image_count;
 };
 
-struct DepthBuffer
+struct DepthBuffer : public NonCopyable
 {
+    ~DepthBuffer()
+    {
+        // Destroy depth buffer
+        device.destroyImage(image);
+        device.destroyImageView(view);
+        device.freeMemory(memory);
+    }
+
+    vk::Device device;
     vk::Image image;
     vk::DeviceMemory memory;
     vk::ImageView view;
 };
+
+constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
 class VkWindow
 {
@@ -59,9 +70,6 @@ private:
     void create_depth_buffer();
     void create_present_queue();
 
-    bool queue_present(vk::Queue queue, uint32_t imageIndex, vk::Semaphore waitSemaphore = VK_NULL_HANDLE);
-    void acquire_next_image(vk::Semaphore semaphore, uint32_t image_index);
-
 public:
     // Window attributes
     GLFWwindow* window;
@@ -74,9 +82,8 @@ public:
     vk::Queue present_queue;
 
     // Swapchain objects
-    vk::SurfaceKHR surface;
-    vk::SwapchainKHR swapchain;
-    vk::RenderPass render_pass;
+    vk::UniqueSurfaceKHR surface;
+    vk::UniqueSwapchainKHR swapchain;
     std::vector<SwapchainBuffer> buffers;
     SwapchainInfo swapchain_info;
     uint32_t current_frame = 0, image_index = 0;
@@ -87,7 +94,7 @@ public:
 
     // Synchronization
     vk::SubmitInfo submit_info;
-    std::vector<vk::Semaphore> image_semaphores;
-    std::vector<vk::Semaphore> render_semaphores;
-    std::vector<vk::Fence> flight_fences;
+    std::vector<vk::UniqueSemaphore> image_semaphores;
+    std::vector<vk::UniqueSemaphore> render_semaphores;
+    std::vector<vk::UniqueFence> flight_fences;
 };
