@@ -86,6 +86,7 @@ void VkWindow::begin_frame()
     command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, context->graphics_pipeline.get());
     command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, context->pipeline_layout.get(), 0,
                                       context->descriptor_sets[current_frame], {});
+    command_buffer.setDepthCompareOp(vk::CompareOp::eGreaterOrEqual);
 }
 
 void VkWindow::end_frame()

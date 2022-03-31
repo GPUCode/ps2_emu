@@ -19,9 +19,9 @@ namespace gs
 
         // Configure texture
         buffer->create(MAX_VERTICES);
-        pixels->create(640 * 224 * 4, vk::MemoryPropertyFlagBits::eDeviceLocal,
+        pixels->create(640 * 256 * 4, vk::MemoryPropertyFlagBits::eDeviceLocal,
                        vk::BufferUsageFlagBits::eStorageTexelBuffer | vk::BufferUsageFlagBits::eTransferDst);
-        staging->create(640 * 224 * 4, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+        staging->create(640 * 256 * 4, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
                         vk::BufferUsageFlagBits::eTransferSrc);
 
         // Create vulkan graphics pipeline
@@ -63,12 +63,12 @@ namespace gs
 
     void GSRenderer::render()
     {
+        // Flush renderer
+        auto& command_buffer = window->context->get_command_buffer();
+
         // Update vertex buffer
         if (!draw_data.empty())
         {
-            // Flush renderer
-            auto& command_buffer = window->context->get_command_buffer();
-
             buffer->bind(command_buffer);
             command_buffer.draw(vertex_count, 1, draw_data.size() - vertex_count, 0);
             vertex_count = 0;
@@ -76,6 +76,11 @@ namespace gs
             // Copy the vertices to the GPU
             buffer->copy_vertices(draw_data.data(), draw_data.size());
             draw_data.clear();
+        }
+        else
+        {
+            buffer->bind(command_buffer);
+            command_buffer.draw(6, 1, 0, 0);
         }
     }
     

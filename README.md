@@ -17,7 +17,7 @@ This project does not aim to replace existing PS2 emulators like PCSX2 and Dobie
 
 
 ## Screenshots
-![](screenshots/stars.png) ![](screenshots/vram.png)
+![](screenshots/stars.png) ![](screenshots/texture.png)
 
 ## Compiling
 

@@ -219,8 +219,6 @@ namespace gs
 		case 0x47:
 		case 0x48:
         {
-			test[context] = data;
-			
             // Flush renderer
             auto& command_buffer = renderer.window->context->get_command_buffer();
 
@@ -228,8 +226,10 @@ namespace gs
             command_buffer.draw(renderer.vertex_count, 1, renderer.draw_data.size() - renderer.vertex_count, 0);
             renderer.vertex_count = 0;
 
-            uint32_t new_depth = (test[context] >> 17) & 0x3;
+            // Set new depth function
+            uint32_t new_depth = (data >> 17) & 0x3;
             renderer.set_depth_function(new_depth);
+            test[context] = data;
 			break;
         }
 		case 0x49:
@@ -257,9 +257,11 @@ namespace gs
 			trxreg.value = data;
 			break;
 		case 0x53:
+        {
 			trxdir = data;
 			data_written = 0;
-			break;
+            break;
+        }
 		default:
             common::Emulator::terminate("[GS] Writting {:#x} to unknown address {:#x}\n", data, addr);
 		}
@@ -292,7 +294,7 @@ namespace gs
 				uint16_t x = data_written % width_in_pixels;
 				uint16_t y = data_written / width_in_pixels;
 
-				fmt::print("[GS] Writing to PSMCT32 buffer at ({}, {})\n", x, y);
+                fmt::print("[GS] Writing {:#x} to PSMCT32 buffer at ({}, {})\n", pixels[i], x, y);
 
 				x += trxpos.dest_top_left_x;
 				y += trxpos.dest_top_left_y;
@@ -343,8 +345,8 @@ namespace gs
 
             // Copy texture data to the GPU
             auto ptr = reinterpret_cast<uint8_t*>(&vram[frame[0].base_ptr * 32]);
-            std::memcpy(renderer.staging->memory, ptr, 640 * 224 * 4);
-            Buffer::copy_buffer(*renderer.staging, *renderer.pixels, vk::BufferCopy(0, 0, 640 * 224 * 4));
+            std::memcpy(renderer.staging->memory, ptr, 640 * 256 * 4);
+            Buffer::copy_buffer(*renderer.staging, *renderer.pixels, vk::BufferCopy(0, 0, 640 * 256 * 4));
 
 			/* Deactivate TRXDIR */
 			trxdir = TRXDir::None;
